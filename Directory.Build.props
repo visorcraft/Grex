@@ -1,0 +1,8 @@
+<Project>
+  <!-- Single source of truth for the product version across all projects. -->
+  <!-- Note: Package.appxmanifest carries its own 4-part version (1.1.0.0) as -->
+  <!-- required by the MSIX schema; keep it in sync with this value. -->
+  <PropertyGroup>
+    <Version>1.1.0</Version>
+  </PropertyGroup>
+</Project>

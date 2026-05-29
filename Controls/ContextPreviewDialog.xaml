@@ -1,0 +1,76 @@
+<UserControl x:Class="Grex.Controls.ContextPreviewDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="using:Grex.Models"
+             x:Name="ContextPreviewControl">
+    <Grid MinWidth="600" MaxWidth="900" MaxHeight="500">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- File info header -->
+        <Border Grid.Row="0"
+                Padding="12,8"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                CornerRadius="4"
+                Margin="0,0,0,8">
+            <TextBlock x:Name="FileInfoTextBlock"
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       TextTrimming="CharacterEllipsis"/>
+        </Border>
+
+        <!-- Context lines -->
+        <Border Grid.Row="1"
+                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                CornerRadius="4"
+                Padding="0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="LinesItemsControl">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:ContextLine">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" MinWidth="20"/>
+                                    <ColumnDefinition Width="Auto" MinWidth="50"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Match indicator -->
+                                <Border Grid.Column="0"
+                                        Width="4"
+                                        VerticalAlignment="Stretch"
+                                        Background="{x:Bind local:ContextPreviewDialog.GetMatchIndicatorBrush(IsMatchLine), Mode=OneTime}"
+                                        xmlns:local="using:Grex.Controls"/>
+
+                                <!-- Line number gutter -->
+                                <Border Grid.Column="1"
+                                        Padding="8,4,12,4"
+                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                    <TextBlock Text="{x:Bind LineNumber}"
+                                               FontFamily="Consolas"
+                                               FontSize="12"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               HorizontalAlignment="Right"/>
+                                </Border>
+
+                                <!-- Line content -->
+                                <Border Grid.Column="2"
+                                        Padding="8,4"
+                                        Background="{x:Bind local:ContextPreviewDialog.GetLineBrush(IsMatchLine), Mode=OneTime}"
+                                        xmlns:local="using:Grex.Controls">
+                                    <TextBlock Text="{x:Bind Content}"
+                                               FontFamily="Consolas"
+                                               FontSize="12"
+                                               TextWrapping="NoWrap"/>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>
