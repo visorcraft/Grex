@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "licenses": {
+    "MIT": "The MIT License (MIT)\n\nCopyright (c) .NET Foundation and Contributors\n\nAll rights reserved.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.",
+    "MIT-Newtonsoft": "The MIT License (MIT)\n\nCopyright (c) 2007 James Newton-King\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of\nthis software and associated documentation files (the \"Software\"), to deal in\nthe Software without restriction, including without limitation the rights to\nuse, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of\nthe Software, and to permit persons to whom the Software is furnished to do so,\nsubject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS\nFOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR\nCOPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER\nIN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN\nCONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.",
+    "Microsoft-Segoe-Fluent-Icons": "Segoe Fluent Icons\n\nSegoe Fluent Icons is a proprietary Microsoft icon font that ships with\nWindows 11. Grex uses the operating-system-provided font for navigation and UI\nglyphs and does NOT bundle or redistribute the font file. The font is licensed\nas part of Windows; the Microsoft download/redistribution terms restrict use of\nthe font on other platforms. See the Microsoft reference for details:\nhttps://learn.microsoft.com/windows/apps/design/iconography/segoe-fluent-icons-font\n\nCopyright (c) Microsoft Corporation. All rights reserved.",
+    "BSD-3-Clause-WebView2": "Copyright (C) Microsoft Corporation. All rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are\nmet:\n\n   * Redistributions of source code must retain the above copyright\nnotice, this list of conditions and the following disclaimer.\n   * Redistributions in binary form must reproduce the above\ncopyright notice, this list of conditions and the following disclaimer\nin the documentation and/or other materials provided with the\ndistribution.\n   * The name of Microsoft Corporation, or the names of its contributors \nmay not be used to endorse or promote products derived from this\nsoftware without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS\n\"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT\nLIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR\nA PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT\nOWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,\nSPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT\nLIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,\nDATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY\nTHEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\nOF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.",
+    "Microsoft-WindowsAppSDK": "MICROSOFT SOFTWARE LICENSE TERMS\nMICROSOFT WINDOWS APP SDK\n________________________________________\nIF YOU LIVE IN (OR ARE A BUSINESS WITH A PRINCIPAL PLACE OF BUSINESS IN) THE UNITED STATES, PLEASE READ THE “BINDING ARBITRATION AND CLASS ACTION WAIVER” SECTION BELOW. IT AFFECTS HOW DISPUTES ARE RESOLVED.\n________________________________________\n\nThese license terms are an agreement between you and Microsoft Corporation (or one of its affiliates). They apply to the software named above and any Microsoft services or software updates (except to the extent such services or updates are accompanied by new or additional terms, in which case those different terms apply prospectively and do not alter your or Microsoft’s rights relating to pre-updated software or services). IF YOU COMPLY WITH THESE LICENSE TERMS, YOU HAVE THE RIGHTS BELOW.  BY USING THE SOFTWARE, YOU ACCEPT THESE TERMS.\n\n1. INSTALLATION AND USE RIGHTS.\n\n    a) General. Subject to the terms of this agreement, you may install and use any number of copies of the software to develop and test your applications, solely for use on Windows. When building Generative AI applications follow the guidelines in https://learn.microsoft.com/windows/ai/rai. \n\n    b) Included Microsoft Applications. The software may include other Microsoft applications. These license terms apply to those included applications, if any, unless other license terms are provided with the other Microsoft applications.\n\n    c) Microsoft Platforms. The software may include components from Microsoft Windows. These components are governed by separate agreements and their own product support policies, as described in the license terms found in the installation directory for that component or in the “Licenses” folder accompanying the software.\n\n2. DATA.\n\n    a) Data Collection. The software may collect information about you and your use of the software, and send that to Microsoft. Microsoft may use this information to provide services and improve our products and services. You may opt-out of many of these scenarios, but not all, as described in the product documentation.  There are also some features in the software that may enable you to collect data from users of your applications. If you use these features to enable data collection in your applications, you must comply with applicable law, including providing appropriate notices to users of your applications. You can learn more about data collection and use in the help documentation and the privacy statement at https://aka.ms/privacy. Your use of the software operates as your consent to these practices.\n\n    b) Processing of Personal Data. To the extent Microsoft is a processor or subprocessor of personal data in connection with the software, Microsoft makes the commitments in the European Union General Data Protection Regulation Terms of the Online Services Terms to all customers effective May 25, 2018, at https://docs.microsoft.com/en-us/legal/gdpr.\n\n3. DISTRIBUTABLE CODE. The software may contain code you are permitted to distribute (i.e. make available for third parties) in applications you develop, as described in this Section.\n\n    a) Distribution Rights. The code and test files described below are distributable if included with the software.\n\n        i. Any files that are binplaced with your application by the WindowsAppSDK NuGet package are, by definition, permitted to be redistributed.  This applies to both framework package dependent and self-contained deployments.\n\n        ii. Image Library. You may copy and distribute images, graphics, and animations in the Image Library as described in the software documentation; and\n\n        iii. Third Party Distribution. You may permit distributors of your applications to copy and distribute any of this distributable code you elect to distribute with your applications.\n\n    b) Distribution Requirements. For any code you distribute, you must:\n\n        i. add significant primary functionality to it in your applications;\n\n        ii. require distributors and external end users to agree to terms that protect it and Microsoft at least as much as this agreement; and\n\n        iii. indemnify, defend, and hold harmless Microsoft from any claims, including attorneys’ fees, related to the distribution or use of your applications, except to the extent that any claim is based solely on the unmodified distributable code.\n\n    c) Distribution Restrictions. You may not:\n\n        i. use Microsoft’s trademarks or trade dress in your application in any way that suggests your application comes from or is endorsed by Microsoft; or\n\n        ii. modify or distribute the source code of any distributable code so that any part of it becomes subject to any license that requires that the distributable code, any other part of the software, or any of Microsoft’s other intellectual property be disclosed or distributed in source code form, or that others have the right to modify it.\n\n4. SCOPE OF LICENSE. The software is licensed, not sold. Microsoft reserves all other rights. Unless applicable law gives you more rights despite this limitation, you will not (and have no right to):\n\n    a) work around any technical limitations in the software that only allow you to use it in certain ways;\n\n    b) reverse engineer, decompile or disassemble the software, or otherwise attempt to derive the source code for the software, except and to the extent required by third party licensing terms governing use of certain open source components that may be included in the software;\n\n    c) remove, minimize, block, or modify any notices of Microsoft or its suppliers in the software;\n\n    d) use the software in any way that is against the law or to create or propagate malware; or\n\n    e) share, publish, distribute, or lease the software (except for any distributable code, subject to the terms above), provide the software as a stand-alone offering for others to use, or transfer the software or this agreement to any third party.\n\n5. EXPORT RESTRICTIONS. You must comply with all domestic and international export laws and regulations that apply to the software, which include restrictions on destinations, end users, and end use. For further information on export restrictions, visit https://aka.ms/exporting.\n\n6. SUPPORT SERVICES. Microsoft is not obligated under this agreement to provide any support services for the software. Any support provided is “as is”, “with all faults”, and without warranty of any kind.\n\n7. UPDATES. The software may periodically check for updates, and download and install them for you. You may obtain updates only from Microsoft or authorized sources. Microsoft may need to update your system to provide you with updates. You agree to receive these automatic updates without any additional notice. Updates may not include or support all existing software features, services, or peripheral devices.\n\n8. BINDING ARBITRATION AND CLASS ACTION WAIVER. This Section applies if you live in (or, if a business, your principal place of business is in) the United States.  If you and Microsoft have a dispute, you and Microsoft agree to try for 60 days to resolve it informally. If you and Microsoft can’t, you and Microsoft agree to binding individual arbitration before the American Arbitration Association under the Federal Arbitration Act (“FAA”), and not to sue in court in front of a judge or jury. Instead, a neutral arbitrator will decide. Class action lawsuits, class-wide arbitrations, private attorney-general actions, and any other proceeding where someone acts in a representative capacity are not allowed; nor is combining individual proceedings without the consent of all parties. The complete Arbitration Agreement contains more terms and is at https://aka.ms/arb-agreement-4. You and Microsoft agree to these terms.\n\n9. ENTIRE AGREEMENT. This agreement, and any other terms Microsoft may provide for supplements, updates, or third-party applications, is the entire agreement for the software.\n\n10. APPLICABLE LAW AND PLACE TO RESOLVE DISPUTES. If you acquired the software in the United States or Canada, the laws of the state or province where you live (or, if a business, where your principal place of business is located) govern the interpretation of this agreement, claims for its breach, and all other claims (including consumer protection, unfair competition, and tort claims), regardless of conflict of laws principles, except that the FAA governs everything related to arbitration. If you acquired the software in any other country, its laws apply, except that the FAA governs everything related to arbitration. If U.S. federal jurisdiction exists, you and Microsoft consent to exclusive jurisdiction and venue in the federal court in King County, Washington for all disputes heard in court (excluding arbitration). If not, you and Microsoft consent to exclusive jurisdiction and venue in the Superior Court of King County, Washington for all disputes heard in court (excluding arbitration).\n\n11. CONSUMER RIGHTS; REGIONAL VARIATIONS. This agreement describes certain legal rights. You may have other rights, including consumer rights, under the laws of your state or country. Separate and apart from your relationship with Microsoft, you may also have rights with respect to the party from which you acquired the software. This agreement does not change those other rights if the laws of your state or country do not permit it to do so. For example, if you acquired the software in one of the below regions, or mandatory country law applies, then the following provisions apply to you:\n\n    a) Australia. You have statutory guarantees under the Australian Consumer Law and nothing in this agreement is intended to affect those rights.\n\n    b) Canada. If you acquired this software in Canada, you may stop receiving updates by turning off the automatic update feature, disconnecting your device from the Internet (if and when you re-connect to the Internet, however, the software will resume checking for and installing updates), or uninstalling the software. The product documentation, if any, may also specify how to turn off updates for your specific device or software.\n\n    c) Germany and Austria.\n\n        i. Warranty. The properly licensed software will perform substantially as described in any Microsoft materials that accompany the software. However, Microsoft gives no contractual guarantee in relation to the licensed software.\n\n        ii. Limitation of Liability. In case of intentional conduct, gross negligence, claims based on the Product Liability Act, as well as, in case of death or personal or physical injury, Microsoft is liable according to the statutory law.\n\n        Subject to the foregoing clause ii., Microsoft will only be liable for slight negligence if Microsoft is in breach of such material contractual obligations, the fulfillment of which facilitate the due performance of this agreement, the breach of which would endanger the purpose of this agreement and the compliance with which a party may constantly trust in (so-called \"cardinal obligations\"). In other cases of slight negligence, Microsoft will not be liable for slight negligence.\n\n12. DISCLAIMER OF WARRANTY. THE SOFTWARE IS LICENSED “AS IS.” YOU BEAR THE RISK OF USING IT. MICROSOFT GIVES NO EXPRESS WARRANTIES, GUARANTEES, OR CONDITIONS. TO THE EXTENT PERMITTED UNDER APPLICABLE LAWS, MICROSOFT EXCLUDES ALL IMPLIED WARRANTIES, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.\n\n13. LIMITATION ON AND EXCLUSION OF DAMAGES. IF YOU HAVE ANY BASIS FOR RECOVERING DAMAGES DESPITE THE PRECEDING DISCLAIMER OF WARRANTY, YOU CAN RECOVER FROM MICROSOFT AND ITS SUPPLIERS ONLY DIRECT DAMAGES UP TO U.S. $5.00. YOU CANNOT RECOVER ANY OTHER DAMAGES, INCLUDING CONSEQUENTIAL, LOST PROFITS, SPECIAL, INDIRECT, OR INCIDENTAL DAMAGES.\n\nThis limitation applies to (a) anything related to the software, services, content (including code) on third party Internet sites, or third party applications; and (b) claims for breach of contract, warranty, guarantee, or condition; strict liability, negligence, or other tort; or any other claim; in each case to the extent permitted by applicable law.\n\nIt also applies even if Microsoft knew or should have known about the possibility of the damages. The above limitation or exclusion may not apply to you because your state, province, or country may not allow the exclusion or limitation of incidental, consequential, or other damages.",
+    "Microsoft-DotNet-Library": "MICROSOFT SOFTWARE LICENSE TERMS\n\nMICROSOFT .NET LIBRARY\n\nThese license terms are an agreement between you and Microsoft Corporation (or based on where you live, one of its affiliates). They apply to the software named above. The terms also apply to any Microsoft services or updates for the software, except to the extent those have different terms.\n\nIf you comply with these license terms, you have the rights below.\n==================================================================\n\n1.    INSTALLATION AND USE RIGHTS.\n----------------------------------\n\nYou may install and use any number of copies of the software to develop and test your applications.\n\n2.    THIRD PARTY COMPONENTS. The software may include third party components with separate legal notices or governed by other agreements, as may be described in the ThirdPartyNotices file(s) accompanying the software.\n\n3.    ADDITIONAL LICENSING REQUIREMENTS AND/OR USE RIGHTS.\n\na.     DISTRIBUTABLE CODE.  The software is comprised of Distributable Code. \"Distributable Code\" is code that you are permitted to distribute in applications you develop if you comply with the terms below.\n\ni.      Right to Use and Distribute.\n\nYou may copy and distribute the object code form of the software.\n\nThird Party Distribution. You may permit distributors of your applications to copy and distribute the Distributable Code as part of those applications.\n\nii.     Distribution Requirements. For any Distributable Code you distribute, you must\n\nuse the Distributable Code in your applications and not as a standalone distribution;\n\nrequire distributors and external end users to agree to terms that protect it at least as much as this agreement; and\n\nindemnify, defend, and hold harmless Microsoft from any claims, including attorneys' fees, related to the distribution or use of your applications, except to the extent that any claim is based solely on the unmodified Distributable Code.\n\niii.   Distribution Restrictions. You may not\n\nuse Microsoft's trademarks in your applications' names or in a way that suggests your applications come from or are endorsed by Microsoft; or\n\nmodify or distribute the source code of any Distributable Code so that any part of it becomes subject to an Excluded License. An \"Excluded License\" is one that requires, as a condition of use, modification or distribution of code, that (i) it be disclosed or distributed in source code form; or (ii) others have the right to modify it.\n\n4.    DATA.\n\na.     Data Collection. The software may collect information about you and your use of the software, and send that to Microsoft. Microsoft may use this information to provide services and improve our products and services. You may opt-out of many of these scenarios, but not all, as described in the software documentation. There are also some features in the software that may enable you and Microsoft to collect data from users of your applications. If you use these features, you must comply with applicable law, including providing appropriate notices to users of your applications together with Microsoft's privacy statement. Our privacy statement is located at https://go.microsoft.com/fwlink/?LinkID=824704. You can learn more about data collection and its use from the software documentation and our privacy statement. Your use of the software operates as your consent to these practices.\n\nb.    Processing of Personal Data. To the extent Microsoft is a processor or subprocessor of personal data in connection with the software, Microsoft makes the commitments in the European Union General Data Protection Regulation Terms of the Online Services Terms to all customers effective May 25, 2018, at https://learn.microsoft.com/en-us/legal/gdpr.\n\n5.    Scope of License. The software is licensed, not sold. This agreement only gives you some rights to use the software. Microsoft reserves all other rights. Unless applicable law gives you more rights despite this limitation, you may use the software only as expressly permitted in this agreement. In doing so, you must comply with any technical limitations in the software that only allow you to use it in certain ways. You may not\n\nwork around any technical limitations in the software;\n\nreverse engineer, decompile or disassemble the software, or otherwise attempt to derive the source code for the software, except and to the extent required by third party licensing terms governing use of certain open source components that may be included in the software;\n\nremove, minimize, block or modify any notices of Microsoft or its suppliers in the software;\n\nuse the software in any way that is against the law; or\n\nshare, publish, rent or lease the software, provide the software as a stand-alone offering for others to use, or transfer the software or this agreement to any third party.\n\n6.    Export Restrictions. You must comply with all domestic and international export laws and regulations that apply to the software, which include restrictions on destinations, end users, and end use. For further information on export restrictions, visit www.microsoft.com/exporting.\n\n7.    SUPPORT SERVICES. Because this software is \"as is,\" we may not provide support services for it.\n\n8.    Entire Agreement. This agreement, and the terms for supplements, updates, Internet-based services and support services that you use, are the entire agreement for the software and support services.\n\n9.    Applicable Law. If you acquired the software in the United States, Washington law applies to interpretation of and claims for breach of this agreement, and the laws of the state where you live apply to all other claims. If you acquired the software in any other country, its laws apply.\n\n10. CONSUMER RIGHTS; REGIONAL VARIATIONS. This agreement describes certain legal rights. You may have other rights, including consumer rights, under the laws of your state or country. Separate and apart from your relationship with Microsoft, you may also have rights with respect to the party from which you acquired the software. This agreement does not change those other rights if the laws of your state or country do not permit it to do so. For example, if you acquired the software in one of the below regions, or mandatory country law applies, then the following provisions apply to you:\n\na)    Australia. You have statutory guarantees under the Australian Consumer Law and nothing in this agreement is intended to affect those rights.\n\nb)    Canada. If you acquired this software in Canada, you may stop receiving updates by turning off the automatic update feature, disconnecting your device from the Internet (if and when you re-connect to the Internet, however, the software will resume checking for and installing updates), or uninstalling the software. The product documentation, if any, may also specify how to turn off updates for your specific device or software.\n\nc)    Germany and Austria.\n\n(i) Warranty. The software will perform substantially as described in any Microsoft materials that accompany it. However, Microsoft gives no contractual guarantee in relation to the software.\n\n(ii) Limitation of Liability. In case of intentional conduct, gross negligence, claims based on the Product Liability Act, as well as in case of death or personal or physical injury, Microsoft is liable according to the statutory law.\n\nSubject to the foregoing clause (ii), Microsoft will only be liable for slight negligence if Microsoft is in breach of such material contractual obligations, the fulfillment of which facilitate the due performance of this agreement, the breach of which would endanger the purpose of this agreement and the compliance with which a party may constantly trust in (so-called \"cardinal obligations\"). In other cases of slight negligence, Microsoft will not be liable for slight negligence\n\n11. Disclaimer of Warranty. THE SOFTWARE IS LICENSED \"AS-IS.\" YOU BEAR THE RISK OF USING IT. MICROSOFT GIVES NO EXPRESS WARRANTIES, GUARANTEES OR CONDITIONS. TO THE EXTENT PERMITTED UNDER YOUR LOCAL LAWS, MICROSOFT EXCLUDES THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.\n\n12. Limitation on and Exclusion of Remedies and Damages. YOU CAN RECOVER FROM MICROSOFT AND ITS SUPPLIERS ONLY DIRECT DAMAGES UP TO U.S. $5.00. YOU CANNOT RECOVER ANY OTHER DAMAGES, INCLUDING CONSEQUENTIAL, LOST PROFITS, SPECIAL, INDIRECT OR INCIDENTAL DAMAGES.\n\nThis limitation applies to (a) anything related to the software, services, content (including code) on third party Internet sites, or third party applications; and (b) claims for breach of contract, breach of warranty, guarantee or condition, strict liability, negligence, or other tort to the extent permitted by applicable law.\n\nIt also applies even if Microsoft knew or should have known about the possibility of the damages. The above limitation or exclusion may not apply to you because your state or country may not allow the exclusion or limitation of incidental, consequential or other damages."
+  },
+  "components": [
+    {
+      "name": "Docker.DotNet",
+      "version": "3.125.15",
+      "license": "MIT",
+      "copyright": "Copyright (c) .NET Foundation and Contributors",
+      "url": "https://github.com/dotnet/Docker.DotNet",
+      "category": "library"
+    },
+    {
+      "name": "Newtonsoft.Json",
+      "version": "13.0.1",
+      "license": "MIT-Newtonsoft",
+      "copyright": "Copyright © James Newton-King 2008",
+      "url": "https://www.newtonsoft.com/json",
+      "category": "library"
+    },
+    {
+      "name": "Microsoft.WindowsAppSDK",
+      "version": "1.8.250907003",
+      "license": "Microsoft-WindowsAppSDK",
+      "copyright": "Copyright (c) Microsoft Corporation.",
+      "url": "https://github.com/microsoft/WindowsAppSDK",
+      "category": "library"
+    },
+    {
+      "name": "Microsoft.WindowsAppSDK.Base",
+      "version": "1.8.250831001",
+      "license": "Microsoft-WindowsAppSDK",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "url": "https://github.com/microsoft/WindowsAppSDK",
+      "category": "library"
+    },
+    {
+      "name": "Microsoft.WindowsAppSDK.Foundation",
+      "version": "1.8.250906002",
+      "license": "Microsoft-WindowsAppSDK",
+      "copyright": "",
+      "url": "https://github.com/microsoft/WindowsAppSDK",
+      "category": "library"
+    },
+    {
+      "name": "Microsoft.WindowsAppSDK.WinUI",
+      "version": "1.8.250906003",
+      "license": "Microsoft-WindowsAppSDK",
+      "copyright": "Copyright (c) Microsoft Corporation.",
+      "url": "https://github.com/microsoft/WindowsAppSDK",
+      "category": "library"
+    },
+    {
+      "name": "Microsoft.WindowsAppSDK.Runtime",
+      "version": "1.8.250907003",
+      "license": "Microsoft-WindowsAppSDK",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "url": "https://github.com/microsoft/WindowsAppSDK",
+      "category": "library"
+    },
+    {
+      "name": "Microsoft.WindowsAppSDK.DWrite",
+      "version": "1.8.25090401",
+      "license": "Microsoft-WindowsAppSDK",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "url": "https://github.com/microsoft/WindowsAppSDK",
+      "category": "library"
+    },
+    {
+      "name": "Microsoft.WindowsAppSDK.InteractiveExperiences",
+      "version": "1.8.250906004",
+      "license": "Microsoft-WindowsAppSDK",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "url": "https://github.com/microsoft/WindowsAppSDK",
+      "category": "library"
+    },
+    {
+      "name": "Microsoft.WindowsAppSDK.Widgets",
+      "version": "1.8.250904007",
+      "license": "Microsoft-WindowsAppSDK",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "url": "https://github.com/microsoft/WindowsAppSDK",
+      "category": "library"
+    },
+    {
+      "name": "Microsoft.WindowsAppSDK.AI",
+      "version": "1.8.37",
+      "license": "Microsoft-WindowsAppSDK",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "url": "https://github.com/microsoft/WindowsAppSDK",
+      "category": "library"
+    },
+    {
+      "name": "Microsoft.Web.WebView2",
+      "version": "1.0.3179.45",
+      "license": "BSD-3-Clause-WebView2",
+      "copyright": "Copyright (C) Microsoft Corporation. All rights reserved.",
+      "url": "https://learn.microsoft.com/microsoft-edge/webview2/",
+      "category": "library"
+    },
+    {
+      "name": "System.Data.OleDb",
+      "version": "8.0.0",
+      "license": "MIT",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "url": "https://github.com/dotnet/runtime",
+      "category": "library"
+    },
+    {
+      "name": "System.Configuration.ConfigurationManager",
+      "version": "8.0.0",
+      "license": "MIT",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "url": "https://github.com/dotnet/runtime",
+      "category": "library"
+    },
+    {
+      "name": "System.Diagnostics.EventLog",
+      "version": "8.0.0",
+      "license": "MIT",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "url": "https://github.com/dotnet/runtime",
+      "category": "library"
+    },
+    {
+      "name": "System.Diagnostics.PerformanceCounter",
+      "version": "8.0.0",
+      "license": "MIT",
+      "copyright": "Copyright (c) .NET Foundation and Contributors",
+      "url": "https://github.com/dotnet/runtime",
+      "category": "library"
+    },
+    {
+      "name": "System.Security.Cryptography.ProtectedData",
+      "version": "8.0.0",
+      "license": "MIT",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "url": "https://github.com/dotnet/runtime",
+      "category": "library"
+    },
+    {
+      "name": "System.Buffers",
+      "version": "4.5.1",
+      "license": "MIT",
+      "copyright": "Copyright (c) .NET Foundation and Contributors",
+      "url": "https://github.com/dotnet/runtime",
+      "category": "library"
+    },
+    {
+      "name": "System.Threading.Tasks.Extensions",
+      "version": "4.5.4",
+      "license": "MIT",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "url": "https://github.com/dotnet/runtime",
+      "category": "library"
+    },
+    {
+      "name": ".NET 8 Runtime",
+      "version": "8.0",
+      "license": "Microsoft-DotNet-Library",
+      "copyright": "Copyright (c) .NET Foundation and Contributors",
+      "url": "https://dotnet.microsoft.com/",
+      "category": "platform"
+    },
+    {
+      "name": "Segoe Fluent Icons",
+      "version": "Windows 11 system font",
+      "license": "Microsoft-Segoe-Fluent-Icons",
+      "copyright": "Copyright (c) Microsoft Corporation. All rights reserved.",
+      "url": "https://learn.microsoft.com/windows/apps/design/iconography/segoe-fluent-icons-font",
+      "category": "platform"
+    }
+  ]
+}
