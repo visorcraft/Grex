@@ -2,9 +2,15 @@
 """Tests for generate_third_party_notices.py.
 
 Run from the repo root: python Scripts/test_generate_third_party_notices.py
-(Running the file directly puts Scripts/ on sys.path so the import resolves.)
+or as a module:        python -m unittest Scripts.test_generate_third_party_notices
 """
+import os
+import sys
 import unittest
+
+# Ensure Scripts/ is importable regardless of how the test is invoked
+# (direct, `-m unittest` module mode, or pytest) — mirrors test_add_localization_entry.py.
+sys.path.insert(0, os.path.dirname(__file__))
 
 import generate_third_party_notices as gen
 
