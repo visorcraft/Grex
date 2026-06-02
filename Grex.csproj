@@ -50,12 +50,6 @@
     <PRIResource Include="Strings\**\Resources.resw" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="Assets\third-party-licenses.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
   <!-- Copy assets only when building the main application, not when referenced by test projects -->
   <Target Name="CopyAssetsToOutput" AfterTargets="Build;Publish" Condition="'$(OutputType)' == 'WinExe' AND '$(IsTestProject)' != 'true' AND '$(MSBuildProjectName)' == 'Grex'">
     <PropertyGroup>
@@ -67,6 +61,7 @@
     <ItemGroup>
       <AssetsToCopy Include="Assets\*.png" />
       <AssetsToCopy Include="Assets\*.ico" />
+      <AssetsToCopy Include="Assets\third-party-licenses.json" />
     </ItemGroup>
     <MakeDir Directories="$(_AssetsOutputPath)Assets" Condition="!Exists('$(_AssetsOutputPath)Assets')" />
     <Copy SourceFiles="@(AssetsToCopy)" DestinationFolder="$(_AssetsOutputPath)Assets" SkipUnchangedFiles="true" />
