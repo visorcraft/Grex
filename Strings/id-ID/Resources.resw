@@ -1858,5 +1858,17 @@ Catatan: Beberapa jalur kontainer (seperti node_modules) berisi banyak symlink d
     <value>(no model id returned)</value>
     <comment>status:incomplete</comment>
   </data>
+  <data name="CreditsNavItem.Content" xml:space="preserve">
+    <value>Credits</value>
+    <comment>status:incomplete</comment>
+  </data>
+  <data name="CreditsHeadingTextBlock.Text" xml:space="preserve">
+    <value>Open-Source Licenses</value>
+    <comment>status:incomplete</comment>
+  </data>
+  <data name="CreditsIntroTextBlock.Text" xml:space="preserve">
+    <value>Grex includes the following third-party components. Each is shown with its copyright, project link, and full license text.</value>
+    <comment>status:incomplete</comment>
+  </data>
 </root>
 
