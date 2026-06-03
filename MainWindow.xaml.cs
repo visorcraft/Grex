@@ -1020,6 +1020,7 @@ namespace Grex
                     RegexBuilderContentGrid.Visibility = Visibility.Collapsed;
                     SettingsContentGrid.Visibility = Visibility.Collapsed;
                     AboutContentGrid.Visibility = Visibility.Collapsed;
+                    CreditsContentGrid.Visibility = Visibility.Collapsed;
                     // Show InfoBar when on Search page
                     if (StatusInfoBar != null)
                     {
@@ -1037,6 +1038,7 @@ namespace Grex
                     RegexBuilderContentGrid.Visibility = Visibility.Visible;
                     SettingsContentGrid.Visibility = Visibility.Collapsed;
                     AboutContentGrid.Visibility = Visibility.Collapsed;
+                    CreditsContentGrid.Visibility = Visibility.Collapsed;
                     // Hide InfoBar when on Regex Builder page
                     if (StatusInfoBar != null)
                     {
@@ -1049,6 +1051,7 @@ namespace Grex
                     RegexBuilderContentGrid.Visibility = Visibility.Collapsed;
                     SettingsContentGrid.Visibility = Visibility.Visible;
                     AboutContentGrid.Visibility = Visibility.Collapsed;
+                    CreditsContentGrid.Visibility = Visibility.Collapsed;
                     // Hide InfoBar when on Settings page
                     if (StatusInfoBar != null)
                     {
@@ -1061,7 +1064,21 @@ namespace Grex
                     RegexBuilderContentGrid.Visibility = Visibility.Collapsed;
                     SettingsContentGrid.Visibility = Visibility.Collapsed;
                     AboutContentGrid.Visibility = Visibility.Visible;
+                    CreditsContentGrid.Visibility = Visibility.Collapsed;
                     // Hide InfoBar when on About page
+                    if (StatusInfoBar != null)
+                    {
+                        StatusInfoBar.Visibility = Visibility.Collapsed;
+                    }
+                }
+                else if (tag == "Credits")
+                {
+                    SearchContentGrid.Visibility = Visibility.Collapsed;
+                    RegexBuilderContentGrid.Visibility = Visibility.Collapsed;
+                    SettingsContentGrid.Visibility = Visibility.Collapsed;
+                    AboutContentGrid.Visibility = Visibility.Collapsed;
+                    CreditsContentGrid.Visibility = Visibility.Visible;
+                    // Hide InfoBar when on Credits page
                     if (StatusInfoBar != null)
                     {
                         StatusInfoBar.Visibility = Visibility.Collapsed;
@@ -1353,6 +1370,7 @@ namespace Grex
                 ApplyThemeToElement(RegexBuilderContentGrid, elementTheme, applyBackground: true);
                 ApplyThemeToElement(SettingsContentGrid, elementTheme, applyBackground: true);
                 ApplyThemeToElement(AboutContentGrid, elementTheme, applyBackground: true);
+                ApplyThemeToElement(CreditsContentGrid, elementTheme, applyBackground: true);
                 ApplyThemeToElement(StatusInfoBar, elementTheme, applyBackground: true);
                 
                 // Apply backdrop based on theme preference
@@ -1436,6 +1454,7 @@ namespace Grex
                 ApplyThemeToElement(RegexBuilderContentGrid, elementTheme, applyBackground: false);
                 ApplyThemeToElement(SettingsContentGrid, elementTheme, applyBackground: false);
                 ApplyThemeToElement(AboutContentGrid, elementTheme, applyBackground: false);
+                ApplyThemeToElement(CreditsContentGrid, elementTheme, applyBackground: false);
                 ApplyThemeToElement(StatusInfoBar, elementTheme, applyBackground: false);
 
                 // Apply custom background colors
@@ -1445,6 +1464,7 @@ namespace Grex
                 if (RegexBuilderContentGrid != null) RegexBuilderContentGrid.Background = backgroundBrush;
                 if (SettingsContentGrid != null) SettingsContentGrid.Background = backgroundBrush;
                 if (AboutContentGrid != null) AboutContentGrid.Background = backgroundBrush;
+                if (CreditsContentGrid != null) CreditsContentGrid.Background = backgroundBrush;
                 
                 // Apply to TabView - need to apply to the TabStrip background
                 if (MainTabView != null)
@@ -1950,6 +1970,15 @@ namespace Grex
                 Log($"NotifyThemeAwareControls AboutView ERROR: {ex}");
             }
 
+            try
+            {
+                CreditsView?.ApplyThemeFromHost(args);
+            }
+            catch (Exception ex)
+            {
+                Log($"NotifyThemeAwareControls CreditsView ERROR: {ex}");
+            }
+
             ApplyThemeToSearchTabs(args);
         }
 
@@ -2138,6 +2167,7 @@ namespace Grex
                 RegexBuilderContentGrid?.ClearValue(Grid.BackgroundProperty);
                 SettingsContentGrid?.ClearValue(Grid.BackgroundProperty);
                 AboutContentGrid?.ClearValue(Grid.BackgroundProperty);
+                CreditsContentGrid?.ClearValue(Grid.BackgroundProperty);
                 
                 // Clear root grid
                 if (Content is Grid rootGrid)
@@ -2380,7 +2410,12 @@ namespace Grex
                 {
                     AboutNavItem.Content = locService.GetLocalizedString("AboutNavItem.Content");
                 }
-                
+
+                if (CreditsNavItem != null)
+                {
+                    CreditsNavItem.Content = locService.GetLocalizedString("CreditsNavItem.Content");
+                }
+
                 // Update StatusInfoBar
                 if (StatusInfoBar != null)
                 {
@@ -2411,6 +2446,7 @@ namespace Grex
             {
                 SettingsView?.HostRefreshLocalization();
                 AboutView?.RefreshLocalization();
+                CreditsView?.RefreshLocalization();
                 RefreshTabViewModels();
                 ReloadRegexBuilderView();
                 ReloadSearchTabs();

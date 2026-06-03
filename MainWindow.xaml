@@ -69,6 +69,15 @@
                                 <FontIcon Glyph="&#xE946;" FontFamily="{StaticResource SymbolThemeFontFamily}"/>
                             </NavigationViewItem.Icon>
                         </NavigationViewItem>
+                        <NavigationViewItem x:Name="CreditsNavItem"
+                                          x:Uid="CreditsNavItem"
+                                          Tag="Credits"
+                                          PointerEntered="NavigationItem_PointerEntered"
+                                          PointerExited="NavigationItem_PointerExited">
+                            <NavigationViewItem.Icon>
+                                <FontIcon Glyph="&#xE8A5;" FontFamily="{StaticResource SymbolThemeFontFamily}"/>
+                            </NavigationViewItem.Icon>
+                        </NavigationViewItem>
                     </NavigationView.FooterMenuItems>
                 </NavigationView>
             </SplitView.Pane>
@@ -112,6 +121,9 @@
                     </Grid>
                     <Grid x:Name="AboutContentGrid" Visibility="Collapsed">
                         <controls:AboutView x:Name="AboutView"/>
+                    </Grid>
+                    <Grid x:Name="CreditsContentGrid" Visibility="Collapsed">
+                        <controls:CreditsView x:Name="CreditsView"/>
                     </Grid>
                 </Grid>
             </SplitView.Content>
