@@ -28,20 +28,47 @@ jobs:
       - name: Build solution
         run: dotnet build grex.sln -p:Platform=x64 --configuration Release --no-restore
 
-      # Tests intentionally not run in this workflow
+      # Tests intentionally not run in this workflow.
 
-      - name: Publish application
-        run: dotnet publish Grex.csproj -p:Platform=x64 -c Release -o publish/win-x64
-
-      - name: Package artifacts
+      - name: Publish, package, and build installer
         shell: pwsh
-        run: Compress-Archive -Path publish/win-x64/* -DestinationPath grex-win-x64.zip
+        env:
+          REF_NAME: ${{ github.ref_name }}   # via env (not inline) to avoid script injection
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $v = "$env:REF_NAME" -replace '^v', ''
+          $gui = "dist\grex-$v-win-x64"
+          $cli = "dist\grex-cli-$v-win-x64"
+
+          # Self-contained publishes (match build.ps1 / what the installer bundles).
+          dotnet publish Grex.csproj -p:Platform=x64 -c Release -r win-x64 --self-contained -o $gui
+          if ($LASTEXITCODE) { throw "GUI publish failed ($LASTEXITCODE)" }
+          dotnet publish Grex.Cli/Grex.Cli.csproj -p:Platform=x64 -c Release -r win-x64 --self-contained -o $cli
+          if ($LASTEXITCODE) { throw "CLI publish failed ($LASTEXITCODE)" }
+
+          # Portable zips.
+          Compress-Archive -Path "$gui\*" -DestinationPath "dist\grex-$v-win-x64.zip" -Force
+          Compress-Archive -Path "$cli\*" -DestinationPath "dist\grex-cli-$v-win-x64.zip" -Force
+
+          # Installer (Inno Setup is preinstalled on the runner; fall back to choco if not).
+          $iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) {
+            $iscc = (Get-ChildItem 'C:\Program Files (x86)\Inno Setup *\ISCC.exe', 'C:\Program Files\Inno Setup *\ISCC.exe' -ErrorAction SilentlyContinue | Select-Object -Last 1).FullName
+          }
+          if (-not $iscc) {
+            choco install innosetup -y --no-progress
+            $iscc = (Get-ChildItem 'C:\Program Files (x86)\Inno Setup *\ISCC.exe' -ErrorAction SilentlyContinue | Select-Object -Last 1).FullName
+          }
+          & $iscc "/DAppVersion=$v" "/DSourceDir=$gui" "/DCliDir=$cli" "/DOutputDir=dist" Grex.iss
+          if ($LASTEXITCODE) { throw "Inno Setup compile failed ($LASTEXITCODE)" }
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: grex-win-x64
-          path: grex-win-x64.zip
+          name: grex-release
+          path: |
+            dist/*.zip
+            dist/*-setup.exe
 
   release:
     name: Create Release
@@ -52,12 +79,12 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v8
         with:
-          name: grex-win-x64
+          name: grex-release
           path: artifacts
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: artifacts/grex-win-x64.zip
+          files: artifacts/*
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
