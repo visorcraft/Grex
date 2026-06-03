@@ -21,13 +21,15 @@
 #define AppPublisher "VisorCraft LLC"
 #define AppExeName "Grex.exe"
 #define AppUrl "https://github.com/visorcraft/Grex"
+; VersionInfoVersion must be purely numeric (X.X.X[.X]); strip any pre-release suffix (e.g. "-rc1").
+#define NumericVersion Copy(AppVersion, 1, Pos("-", AppVersion + "-") - 1)
 
 [Setup]
 ; AppId uniquely identifies the app for upgrades/uninstall - keep it constant across versions.
 AppId={{7287EFD0-6C0F-4D44-9CCF-9E22743A9C45}
 AppName={#AppName}
 AppVersion={#AppVersion}
-VersionInfoVersion={#AppVersion}
+VersionInfoVersion={#NumericVersion}
 AppPublisher={#AppPublisher}
 AppPublisherURL={#AppUrl}
 AppSupportURL={#AppUrl}/issues
