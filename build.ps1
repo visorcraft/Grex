@@ -4,7 +4,8 @@
     One-command full build for Grex (Windows only).
 .DESCRIPTION
     Does everything: restore -> build (Release|x64) -> test -> publish the
-    self-contained win-x64 GUI and CLI -> package versioned zips into .\dist\.
+    self-contained win-x64 GUI and CLI -> package versioned zips, and (if Inno
+    Setup is installed) a setup.exe with a built-in uninstaller, into .\dist\.
 
     WinUI 3 only builds on Windows. No parameters - just run:  .\build.ps1
 #>
@@ -67,9 +68,31 @@ Remove-Item -LiteralPath $guiZip, $cliZip -ErrorAction SilentlyContinue
 Compress-Archive -Path (Join-Path $guiDir '*') -DestinationPath $guiZip
 Compress-Archive -Path (Join-Path $cliDir '*') -DestinationPath $cliZip
 
+# Build a setup.exe (with a built-in uninstaller) via Inno Setup, if its compiler is present.
+Step 'Installer (setup.exe)'
+$iscc = (Get-Command 'iscc.exe' -ErrorAction SilentlyContinue).Source
+if (-not $iscc) {
+    foreach ($candidate in @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles}\Inno Setup 6\ISCC.exe")) {
+        if (Test-Path -LiteralPath $candidate) { $iscc = $candidate; break }
+    }
+}
+$setupExe = Join-Path $dist "grex-$Version-setup.exe"
+if ($iscc) {
+    & $iscc "/DAppVersion=$Version" "/DSourceDir=$guiDir" "/DOutputDir=$dist" (Join-Path $PSScriptRoot 'Grex.iss')
+    Confirm-Exit 'Inno Setup compile'
+}
+else {
+    $setupExe = $null
+    Write-Warning 'Inno Setup compiler (ISCC.exe) not found - skipping setup.exe. Get it from https://jrsoftware.org/isdl.php'
+}
+
 Step 'Done'
-foreach ($zip in @($guiZip, $cliZip)) {
-    $file = Get-Item -LiteralPath $zip
+$artifacts = @($guiZip, $cliZip)
+if ($setupExe -and (Test-Path -LiteralPath $setupExe)) { $artifacts += $setupExe }
+foreach ($artifact in $artifacts) {
+    $file = Get-Item -LiteralPath $artifact
     Write-Host ('    {0}  ({1:N1} MB)' -f $file.FullName, ($file.Length / 1MB)) -ForegroundColor Green
 }
 if (-not $testsPassed) {
