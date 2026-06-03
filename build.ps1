@@ -72,15 +72,19 @@ Compress-Archive -Path (Join-Path $cliDir '*') -DestinationPath $cliZip
 Step 'Installer (setup.exe)'
 $iscc = (Get-Command 'iscc.exe' -ErrorAction SilentlyContinue).Source
 if (-not $iscc) {
-    foreach ($candidate in @(
-            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-            "${env:ProgramFiles}\Inno Setup 6\ISCC.exe")) {
-        if (Test-Path -LiteralPath $candidate) { $iscc = $candidate; break }
+    # Find ISCC.exe under any "Inno Setup <n>" folder (6, 7, ...), newest first.
+    foreach ($base in @(${env:ProgramFiles(x86)}, ${env:ProgramFiles})) {
+        if (-not $base) { continue }
+        $hit = Get-ChildItem -LiteralPath $base -Directory -Filter 'Inno Setup *' -ErrorAction SilentlyContinue |
+               ForEach-Object { Join-Path $_.FullName 'ISCC.exe' } |
+               Where-Object { Test-Path -LiteralPath $_ } |
+               Sort-Object -Descending | Select-Object -First 1
+        if ($hit) { $iscc = $hit; break }
     }
 }
 $setupExe = Join-Path $dist "grex-$Version-setup.exe"
 if ($iscc) {
-    & $iscc "/DAppVersion=$Version" "/DSourceDir=$guiDir" "/DOutputDir=$dist" (Join-Path $PSScriptRoot 'Grex.iss')
+    & $iscc "/DAppVersion=$Version" "/DSourceDir=$guiDir" "/DCliDir=$cliDir" "/DOutputDir=$dist" (Join-Path $PSScriptRoot 'Grex.iss')
     Confirm-Exit 'Inno Setup compile'
 }
 else {

@@ -2,12 +2,16 @@
 ; Overridable defines (build.ps1 passes these via /D; the fallbacks are for manual runs):
 ;   AppVersion - product version, e.g. 1.2.0
 ;   SourceDir  - the published, self-contained win-x64 GUI folder to package
+;   CliDir     - the published, self-contained win-x64 CLI folder to package
 ;   OutputDir  - where to write the setup.exe
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
 #ifndef SourceDir
   #define SourceDir "dist\grex-" + AppVersion + "-win-x64"
+#endif
+#ifndef CliDir
+  #define CliDir "dist\grex-cli-" + AppVersion + "-win-x64"
 #endif
 #ifndef OutputDir
   #define OutputDir "dist"
@@ -28,6 +32,8 @@ AppPublisher={#AppPublisher}
 AppPublisherURL={#AppUrl}
 AppSupportURL={#AppUrl}/issues
 AppUpdatesURL={#AppUrl}/releases
+; Per-user install: no UAC prompt; installs under the user's LocalAppData ({autopf} -> {localappdata}\Programs).
+PrivilegesRequired=lowest
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
@@ -41,22 +47,60 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-PrivilegesRequired=admin
+ChangesEnvironment=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "addtopath"; Description: "Add the grex-cli command-line tool to my PATH"; GroupDescription: "Command-line tool:"; Flags: unchecked
 
 [Files]
-; Package everything from the published self-contained GUI folder (app + runtime + Assets).
+; The GUI (self-contained app + runtime + Assets).
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+; The CLI, kept in its own subfolder so its bundled runtime can't collide with the GUI's.
+Source: "{#CliDir}\*"; DestDir: "{app}\cli"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#AppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
+[Registry]
+; Optionally add the CLI folder to the per-user PATH (HKCU - no admin needed). Check avoids duplicates.
+Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\cli"; \
+    Flags: preservestringtype; Tasks: addtopath; Check: NeedsAddPath('{app}\cli')
+
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+{ Returns True only if the given folder is not already on the per-user PATH. }
+function NeedsAddPath(Param: string): Boolean;
+var
+  OrigPath: string;
+begin
+  if not RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', OrigPath) then
+  begin
+    Result := True;
+    exit;
+  end;
+  Result := Pos(';' + Uppercase(ExpandConstant(Param)) + ';', ';' + Uppercase(OrigPath) + ';') = 0;
+end;
+
+{ On uninstall, remove the CLI folder from the per-user PATH (leaves the rest of PATH untouched). }
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Path, CliDir: string;
+begin
+  if CurUninstallStep <> usPostUninstall then
+    exit;
+  if not RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Path) then
+    exit;
+  CliDir := ExpandConstant('{app}\cli');
+  StringChangeEx(Path, ';' + CliDir, '', True);
+  StringChangeEx(Path, CliDir + ';', '', True);
+  StringChangeEx(Path, CliDir, '', True);
+  RegWriteExpandStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Path);
+end;
