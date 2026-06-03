@@ -384,6 +384,9 @@ $RECYCLE.BIN/
 xaml_error.txt
 xaml_output.txt
 
+# build.ps1 output (publish dirs + packaged zips)
+dist/
+
 TASKS.md
 TODO.md
 IDEAS.md
