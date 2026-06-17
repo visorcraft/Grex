@@ -9,7 +9,8 @@ namespace Grex.Services
     /// </summary>
     public static class LogService
     {
-        private static readonly string LogFilePath = Path.Combine(Path.GetTempPath(), "Grex.log");
+        /// <summary>Full path of the default application log file (%Temp%\Grex.log).</summary>
+        public static string LogFilePath { get; } = Path.Combine(Path.GetTempPath(), "Grex.log");
         private static readonly long MaxLogFileBytes = 1024 * 1024; // 1 MB
         private static readonly object LogLock = new object();
 

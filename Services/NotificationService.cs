@@ -307,7 +307,7 @@ namespace Grex.Services
             return _isRegistered;
         }
 
-        public string NotificationLogFilePath => LogFilePath;
+        public string NotificationLogFilePath => LogService.LogFilePath;
         public string? SupportFailureDetails => _supportFailureDetails;
         public string? RegistrationFailureDetails => _registrationFailureDetails;
 
