@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Linq;
 
 namespace Grex.Models
@@ -51,7 +52,7 @@ namespace Grex.Models
             finally
             {
                 _suppressNotifications = false;
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+                RaiseBulkReset();
             }
         }
 
@@ -77,8 +78,19 @@ namespace Grex.Models
             finally
             {
                 _suppressNotifications = false;
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+                RaiseBulkReset();
             }
+        }
+
+        /// <summary>
+        /// Raises the single set of notifications for a completed bulk operation:
+        /// Count and indexer property changes plus one CollectionChanged(Reset).
+        /// </summary>
+        private void RaiseBulkReset()
+        {
+            OnPropertyChanged(new PropertyChangedEventArgs(nameof(Count)));
+            OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
 
         protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
@@ -86,6 +98,14 @@ namespace Grex.Models
             if (!_suppressNotifications)
             {
                 base.OnCollectionChanged(e);
+            }
+        }
+
+        protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+        {
+            if (!_suppressNotifications)
+            {
+                base.OnPropertyChanged(e);
             }
         }
     }

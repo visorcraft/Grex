@@ -66,14 +66,19 @@ namespace Grex.Services
                 }
 
                 var start = bytes.Length - (int)bytesToKeep;
-                while (start < bytes.Length && bytes[start] != '\n')
+
+                // Advance to a clean line boundary so we don't keep a partial first line.
+                // If there is no newline within the retained window (e.g. one huge entry),
+                // keep the raw tail rather than scanning past the end and wiping the file.
+                var lineBoundary = start;
+                while (lineBoundary < bytes.Length && bytes[lineBoundary] != '\n')
                 {
-                    start++;
+                    lineBoundary++;
                 }
 
-                if (start < bytes.Length)
+                if (lineBoundary < bytes.Length)
                 {
-                    start++;
+                    start = lineBoundary + 1;
                 }
 
                 using var stream = new FileStream(logFilePath, FileMode.Create, FileAccess.Write, FileShare.None);

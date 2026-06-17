@@ -847,7 +847,8 @@ namespace Grex.Controls
             LocalizationService.Instance.PropertyChanged -= LocalizationService_PropertyChanged;
             LocalizationService.Instance.PropertyChanged += LocalizationService_PropertyChanged;
             
-            // Subscribe to theme changes and apply initial theme
+            // Subscribe to theme changes and apply initial theme (re-subscribe each time the view is shown)
+            MainWindow.ThemeChanged -= OnThemeChanged;
             MainWindow.ThemeChanged += OnThemeChanged;
             
             // Delay theme application to ensure visual tree is fully populated
@@ -865,12 +866,12 @@ namespace Grex.Controls
             
             // Unsubscribe from localization changes so a recreated view does not leak
             LocalizationService.Instance.PropertyChanged -= LocalizationService_PropertyChanged;
-            
-            // Unsubscribe dropdown events
-            UILanguageComboBox.DropDownOpened -= UILanguageComboBox_DropDownOpened;
-            UILanguageComboBox.DropDownClosed -= UILanguageComboBox_DropDownClosed;
-            CultureComboBox.DropDownOpened -= CultureComboBox_DropDownOpened;
-            CultureComboBox.DropDownClosed -= CultureComboBox_DropDownClosed;
+
+            // Note: the dropdown open/close handlers are intentionally NOT unsubscribed here.
+            // They are subscribed once in the constructor and target this view's own child
+            // ComboBoxes (same lifetime as the view, so no leak). Unsubscribing on Unloaded
+            // without re-subscribing on Loaded would permanently disable the keyboard-navigation
+            // guard the first time the user navigates away from Settings.
         }
 
         
