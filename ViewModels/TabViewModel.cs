@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -18,7 +17,12 @@ namespace Grex.ViewModels
 {
     public class TabViewModel : INotifyPropertyChanged, IDisposable
     {
+        // Dynamic result-filter regexes should not be compiled: .NET caches compiled
+        // regexes indefinitely, so every keystroke would leak memory.
+        private static readonly TimeSpan ResultsFilterRegexTimeout = TimeSpan.FromSeconds(2);
+
         private readonly ISearchService _searchService;
+
         private readonly ILocalizationService _localizationService = LocalizationService.Instance;
         private readonly NotificationService _notificationService = NotificationService.Instance;
         private readonly DockerSearchService _dockerSearchService;
@@ -99,8 +103,8 @@ namespace Grex.ViewModels
                 Log($"TabViewModel constructor: Starting, title: {title}");
                 _searchService = searchService ?? throw new ArgumentNullException(nameof(searchService));
                 _dockerSearchService = dockerSearchService ?? DockerSearchService.Instance;
-                SearchResults = new ObservableCollection<SearchResult>();
-                FileSearchResults = new ObservableCollection<FileSearchResult>();
+                SearchResults = new RangeObservableCollection<SearchResult>();
+                FileSearchResults = new RangeObservableCollection<FileSearchResult>();
                 SetStatus("ReadyStatus");
                 _tabTitle = GetString("TabNewTitle");
                 _originalTabTitle = title ?? GetString("TabTimestampTitleFormat", DateTime.Now.ToString("HH:mm:ss"));
@@ -155,19 +159,7 @@ namespace Grex.ViewModels
             }
         }
 
-        private static void Log(string message)
-        {
-            try
-            {
-                var logFile = Path.Combine(Path.GetTempPath(), "Grex.log");
-                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                File.AppendAllText(logFile, $"[{timestamp}] {message}\n");
-            }
-            catch
-            {
-                // Ignore logging errors
-            }
-        }
+        private static void Log(string message) => LogService.Write(message);
 
         public string TabTitle
         {
@@ -831,8 +823,8 @@ namespace Grex.ViewModels
                                           !IsDockerModeActive) || 
                                         (_isSearching && _isReplaceOperation));
 
-        public ObservableCollection<SearchResult> SearchResults { get; }
-        public ObservableCollection<FileSearchResult> FileSearchResults { get; }
+        public RangeObservableCollection<SearchResult> SearchResults { get; }
+        public RangeObservableCollection<FileSearchResult> FileSearchResults { get; }
 
 
         public async Task PerformSearchAsync()
@@ -968,79 +960,7 @@ namespace Grex.ViewModels
                 {
                     // Aggregate results by file
                     _allFileSearchResults.Clear();
-                    var fileGroups = results.GroupBy(r => r.FullPath);
-                    
-                    foreach (var group in fileGroups)
-                    {
-                        var matches = group.ToList();
-                        if (matches.Count == 0)
-                        {
-                            continue;
-                        }
-
-                        int totalMatchCount = matches.Sum(m => m.MatchCount);
-
-                        var previewMatches = matches
-                            .OrderBy(m => m.LineNumber)
-                            .ThenBy(m => m.ColumnNumber)
-                            .Take(5)
-                            .ToList();
-
-                        var previewResult = previewMatches[0];
-                        var filePath = previewResult.FullPath;
-                        
-                        try
-                        {
-                            // Convert WSL path to Windows path if needed
-                            string windowsPath = ConvertWslPathToWindows(filePath);
-                            
-                            var fileInfo = new FileInfo(windowsPath);
-                            string encoding = DetectFileEncoding(windowsPath);
-                            
-                            var fileResult = new FileSearchResult
-                            {
-                                FileName = previewResult.FileName,
-                                Size = fileInfo.Exists ? fileInfo.Length : 0,
-                                MatchCount = totalMatchCount,
-                                FirstMatchLineNumber = previewResult.LineNumber,
-                                MatchPreviewBefore = previewResult.MatchPreviewBefore,
-                                MatchPreviewMatch = previewResult.MatchPreviewMatch,
-                                MatchPreviewAfter = previewResult.MatchPreviewAfter,
-                                PreviewMatches = previewMatches,
-                                FullPath = filePath,
-                                RelativePath = previewResult.RelativePath,
-                                Extension = Path.GetExtension(filePath).TrimStart('.'),
-                                Encoding = encoding,
-                                DateModified = fileInfo.Exists ? fileInfo.LastWriteTime : DateTime.MinValue
-                            };
-                            
-                            _allFileSearchResults.Add(fileResult);
-                        }
-                        catch (Exception ex)
-                        {
-                            Log($"Error getting file info for {filePath}: {ex.Message}");
-                            // If we can't get file info, still add the result with defaults
-                            // This is a minor error, so we don't show a notification
-                            var fileResult = new FileSearchResult
-                            {
-                                FileName = previewResult.FileName,
-                                Size = 0,
-                                MatchCount = totalMatchCount,
-                                FirstMatchLineNumber = previewResult.LineNumber,
-                                MatchPreviewBefore = previewResult.MatchPreviewBefore,
-                                MatchPreviewMatch = previewResult.MatchPreviewMatch,
-                                MatchPreviewAfter = previewResult.MatchPreviewAfter,
-                                PreviewMatches = previewMatches,
-                                FullPath = filePath,
-                                RelativePath = previewResult.RelativePath,
-                                Extension = Path.GetExtension(filePath).TrimStart('.'),
-                                Encoding = "Unknown",
-                                DateModified = DateTime.MinValue
-                            };
-                            
-                            _allFileSearchResults.Add(fileResult);
-                        }
-                    }
+                    await Task.Run(() => BuildFileSearchResults(results), cancellationToken);
                     
                     int totalMatches = _allFileSearchResults.Sum(f => f.MatchCount);
                     int fileCount = _allFileSearchResults.Count;
@@ -1091,6 +1011,8 @@ namespace Grex.ViewModels
             finally
             {
                 SetIsSearching(false);
+                _searchCancellationTokenSource?.Dispose();
+                _searchCancellationTokenSource = null;
             }
         }
 
@@ -1098,6 +1020,7 @@ namespace Grex.ViewModels
         /// Cancels the current search operation if one is in progress.
         /// </summary>
         public void CancelSearch()
+
         {
             try
             {
@@ -1202,10 +1125,13 @@ namespace Grex.ViewModels
             finally
             {
                 SetIsSearching(false);
+                _searchCancellationTokenSource?.Dispose();
+                _searchCancellationTokenSource = null;
             }
         }
 
         public void ClearResults()
+
         {
             ClearResultsFilter(suppressStatusUpdate: true);
             _allSearchResults.Clear();
@@ -1330,7 +1256,7 @@ namespace Grex.ViewModels
             {
                 try
                 {
-                    _resultsFilterRegex = new Regex(filter, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+                    _resultsFilterRegex = new Regex(filter, RegexOptions.IgnoreCase, ResultsFilterRegexTimeout);
                 }
                 catch (ArgumentException)
                 {
@@ -1347,11 +1273,7 @@ namespace Grex.ViewModels
                     filtered = filtered.Where(r => MatchesFilter(r, filter, _resultsFilterIsRegex, _resultsFilterRegex));
                 }
 
-                FileSearchResults.Clear();
-                foreach (var result in filtered)
-                {
-                    FileSearchResults.Add(result);
-                }
+                FileSearchResults.Reset(filtered);
             }
             else
             {
@@ -1361,11 +1283,7 @@ namespace Grex.ViewModels
                     filtered = filtered.Where(r => MatchesFilter(r, filter, _resultsFilterIsRegex, _resultsFilterRegex));
                 }
 
-                SearchResults.Clear();
-                foreach (var result in filtered)
-                {
-                    SearchResults.Add(result);
-                }
+                SearchResults.Reset(filtered);
             }
 
             UpdateResultsStatusForFilter();
@@ -1687,8 +1605,12 @@ namespace Grex.ViewModels
         public void Dispose()
         {
             SettingsService.DockerSearchEnabledChanged -= OnDockerSearchEnabledChanged;
+            CancelSearch();
+            _searchCancellationTokenSource?.Dispose();
+            _searchCancellationTokenSource = null;
             ScheduleMirrorCleanup();
         }
+
 
         private string ConvertWslPathToWindows(string wslPath)
         {
@@ -1814,6 +1736,83 @@ namespace Grex.ViewModels
             catch
             {
                 return "Unknown";
+            }
+        }
+
+        private void BuildFileSearchResults(List<SearchResult> results)
+        {
+            var fileGroups = results.GroupBy(r => r.FullPath);
+
+            foreach (var group in fileGroups)
+            {
+                var matches = group.ToList();
+                if (matches.Count == 0)
+                {
+                    continue;
+                }
+
+                int totalMatchCount = matches.Sum(m => m.MatchCount);
+
+                var previewMatches = matches
+                    .OrderBy(m => m.LineNumber)
+                    .ThenBy(m => m.ColumnNumber)
+                    .Take(5)
+                    .ToList();
+
+                var previewResult = previewMatches[0];
+                var filePath = previewResult.FullPath;
+
+                try
+                {
+                    // Convert WSL path to Windows path if needed
+                    string windowsPath = ConvertWslPathToWindows(filePath);
+
+                    var fileInfo = new FileInfo(windowsPath);
+                    string encoding = DetectFileEncoding(windowsPath);
+
+                    var fileResult = new FileSearchResult
+                    {
+                        FileName = previewResult.FileName,
+                        Size = fileInfo.Exists ? fileInfo.Length : 0,
+                        MatchCount = totalMatchCount,
+                        FirstMatchLineNumber = previewResult.LineNumber,
+                        MatchPreviewBefore = previewResult.MatchPreviewBefore,
+                        MatchPreviewMatch = previewResult.MatchPreviewMatch,
+                        MatchPreviewAfter = previewResult.MatchPreviewAfter,
+                        PreviewMatches = previewMatches,
+                        FullPath = filePath,
+                        RelativePath = previewResult.RelativePath,
+                        Extension = Path.GetExtension(filePath).TrimStart('.'),
+                        Encoding = encoding,
+                        DateModified = fileInfo.Exists ? fileInfo.LastWriteTime : DateTime.MinValue
+                    };
+
+                    _allFileSearchResults.Add(fileResult);
+                }
+                catch (Exception ex)
+                {
+                    Log($"Error getting file info for {filePath}: {ex.Message}");
+                    // If we can't get file info, still add the result with defaults
+                    // This is a minor error, so we don't show a notification
+                    var fileResult = new FileSearchResult
+                    {
+                        FileName = previewResult.FileName,
+                        Size = 0,
+                        MatchCount = totalMatchCount,
+                        FirstMatchLineNumber = previewResult.LineNumber,
+                        MatchPreviewBefore = previewResult.MatchPreviewBefore,
+                        MatchPreviewMatch = previewResult.MatchPreviewMatch,
+                        MatchPreviewAfter = previewResult.MatchPreviewAfter,
+                        PreviewMatches = previewMatches,
+                        FullPath = filePath,
+                        RelativePath = previewResult.RelativePath,
+                        Extension = Path.GetExtension(filePath).TrimStart('.'),
+                        Encoding = "Unknown",
+                        DateModified = DateTime.MinValue
+                    };
+
+                    _allFileSearchResults.Add(fileResult);
+                }
             }
         }
 

@@ -273,19 +273,7 @@ namespace Grex
             }
         }
 
-        private static void Log(string message)
-        {
-            try
-            {
-                var logFile = Path.Combine(Path.GetTempPath(), "Grex.log");
-                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                File.AppendAllText(logFile, $"[{timestamp}] {message}\n");
-            }
-            catch
-            {
-                // Ignore logging errors
-            }
-        }
+        private static void Log(string message) => LogService.Write(message);
 
         private void SetupWindow()
         {
@@ -410,6 +398,10 @@ namespace Grex
             finally
             {
                 LocalizationService.Instance.PropertyChanged -= LocalizationService_PropertyChanged;
+                if (_appWindow != null)
+                {
+                    _appWindow.Changed -= AppWindow_Changed;
+                }
                 this.Closed -= MainWindow_Closed;
             }
         }
@@ -584,8 +576,9 @@ namespace Grex
                 try
                 {
                     Log("AddTabToView: About to subscribe to PropertyChanged");
-                    // Subscribe to title changes
-                    tabViewModel.PropertyChanged += (s, e) =>
+                    // Subscribe to title changes using a named handler so we can unsubscribe
+                    // when the tab is closed. Anonymous lambdas would keep the TabViewItem alive.
+                    PropertyChangedEventHandler titleHandler = (s, e) =>
                     {
                         try
                         {
@@ -613,6 +606,8 @@ namespace Grex
                             Log($"AddTabToView PropertyChanged handler ERROR: {ex}");
                         }
                     };
+                    tabViewModel.PropertyChanged += titleHandler;
+                    tabItem.Tag = titleHandler;
                     Log("AddTabToView: PropertyChanged subscribed");
                     
                 }
@@ -621,6 +616,7 @@ namespace Grex
                     Log($"AddTabToView ERROR subscribing to PropertyChanged: {ex}");
                     // Don't throw - this is not critical
                 }
+
                 
                 try
                 {
@@ -690,9 +686,21 @@ namespace Grex
                 // Unbind the tab content
                 content.UnbindViewModel();
                 
+                // Remove the title-change handler so the closed tab can be garbage collected
+                if (tabItem.Tag is PropertyChangedEventHandler titleHandler)
+                {
+                    tabToClose.PropertyChanged -= titleHandler;
+                    tabItem.Tag = null;
+                }
+
+                // Detach pointer handlers so the TabViewItem doesn't keep MainWindow alive.
+                tabItem.PointerEntered -= TabItem_PointerEntered;
+                tabItem.PointerExited -= TabItem_PointerExited;
+                
                 // Remove the tab
                 ViewModel.RemoveTab(tabToClose);
                 MainTabView.TabItems.Remove(tabItem);
+
                 
                 // Update selected tab in TabView
                 if (ViewModel.SelectedTab != null)

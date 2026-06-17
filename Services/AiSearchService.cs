@@ -32,11 +32,20 @@ namespace Grex.Services
         public string ErrorMessage { get; init; } = string.Empty;
     }
 
-    public sealed class AiSearchService
+    public sealed class AiSearchService : IDisposable
     {
+
         private const string DefaultModel = "gpt-4o-mini";
 
+        // Share one HttpClient across all service instances to avoid socket/port exhaustion
+        // when tabs are opened and closed frequently.
+        private static readonly Lazy<HttpClient> SharedHttpClient = new(() => new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(90)
+        });
+
         private readonly HttpClient _httpClient;
+        private readonly bool _ownsHttpClient;
         private readonly JsonSerializerOptions _serializerOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -47,10 +56,16 @@ namespace Grex.Services
 
         public AiSearchService(HttpClient? httpClient = null)
         {
-            _httpClient = httpClient ?? new HttpClient
+            if (httpClient != null)
             {
-                Timeout = TimeSpan.FromSeconds(90)
-            };
+                _httpClient = httpClient;
+                _ownsHttpClient = false;
+            }
+            else
+            {
+                _httpClient = SharedHttpClient.Value;
+                _ownsHttpClient = false;
+            }
         }
 
         public async Task<AiSearchResponse> SendDiscussionTurnAsync(
@@ -458,18 +473,15 @@ namespace Grex.Services
             return trimmed.TrimEnd('/');
         }
 
-        private static void Log(string message)
+        private static void Log(string message) => LogService.Write(message);
+
+        public void Dispose()
         {
-            try
+            if (_ownsHttpClient)
             {
-                var logFile = Path.Combine(Path.GetTempPath(), "Grex.log");
-                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                File.AppendAllText(logFile, $"[{timestamp}] {message}\n");
-            }
-            catch
-            {
-                // Ignore logging failures
+                _httpClient.Dispose();
             }
         }
     }
 }
+

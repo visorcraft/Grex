@@ -21,6 +21,7 @@ namespace Grex.Services
         private readonly object _resourceContextLock = new();
         private string _currentCulture = DefaultCulture;
         private const string DefaultCulture = "en-US";
+        private const int MaxResourceContextCacheEntries = 20;
 
         /// <summary>
         /// Gets the singleton instance of the LocalizationService
@@ -326,7 +327,24 @@ namespace Grex.Services
                 var newContext = _resourceManager.CreateResourceContext();
                 newContext.QualifierValues["Language"] = culture;
                 _resourceContexts[culture] = newContext;
+                TrimResourceContextCache();
                 return newContext;
+            }
+        }
+
+        private void TrimResourceContextCache()
+        {
+            if (_resourceContexts.Count <= MaxResourceContextCacheEntries)
+            {
+                return;
+            }
+
+            // Dictionary does not preserve insertion order; removing the first half
+            // of the snapshot keeps memory bounded without adding LRU bookkeeping.
+            var keysToRemove = _resourceContexts.Keys.Take(_resourceContexts.Count / 2).ToList();
+            foreach (var key in keysToRemove)
+            {
+                _resourceContexts.Remove(key);
             }
         }
     }

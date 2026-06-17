@@ -8,7 +8,11 @@ namespace Grex.Services
 {
     public class GitIgnoreService
     {
+        private const int MaxGitignoreCacheEntries = 100;
+        private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromSeconds(5);
         private readonly Dictionary<string, List<GitIgnoreRule>> _gitignoreCache = new();
+        private readonly object _cacheLock = new();
+
 
         public bool ShouldIgnoreFile(string filePath, string rootPath)
         {
@@ -67,15 +71,22 @@ namespace Grex.Services
 
         private List<GitIgnoreRule> GetGitIgnoreRules(string gitignorePath, string gitignoreDirectory)
         {
-            if (_gitignoreCache.TryGetValue(gitignorePath, out var cached))
+            lock (_cacheLock)
             {
-                return cached;
+                if (_gitignoreCache.TryGetValue(gitignorePath, out var cached))
+                {
+                    return cached;
+                }
             }
 
             var rules = new List<GitIgnoreRule>();
             if (!File.Exists(gitignorePath))
             {
-                _gitignoreCache[gitignorePath] = rules;
+                lock (_cacheLock)
+                {
+                    _gitignoreCache[gitignorePath] = rules;
+                    TrimCacheIfNeeded();
+                }
                 return rules;
             }
 
@@ -108,9 +119,28 @@ namespace Grex.Services
                 // If we can't read the file, return empty rules
             }
 
-            _gitignoreCache[gitignorePath] = rules;
+            lock (_cacheLock)
+            {
+                _gitignoreCache[gitignorePath] = rules;
+                TrimCacheIfNeeded();
+            }
             return rules;
         }
+
+        private void TrimCacheIfNeeded()
+        {
+            // Keep memory bounded. Because SearchService enumerates files in parallel,
+            // the cache must be protected by _cacheLock.
+            if (_gitignoreCache.Count > MaxGitignoreCacheEntries)
+            {
+                var keysToRemove = _gitignoreCache.Keys.Take(_gitignoreCache.Count / 2).ToList();
+                foreach (var key in keysToRemove)
+                {
+                    _gitignoreCache.Remove(key);
+                }
+            }
+        }
+
 
         private bool? CheckRules(List<GitIgnoreRule> rules, string relativePath, string fileName, bool isDirectory)
         {
@@ -174,7 +204,7 @@ namespace Grex.Services
             try
             {
                 // Try matching against the full relative path
-                if (Regex.IsMatch(relativePath, regexPattern, RegexOptions.IgnoreCase))
+                if (Regex.IsMatch(relativePath, regexPattern, RegexOptions.IgnoreCase, RegexMatchTimeout))
                     return true;
 
                 // For root-relative patterns (starting with /), only match the full path, not segments
@@ -185,22 +215,23 @@ namespace Grex.Services
                 }
 
                 // Try matching against just the filename
-                if (Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase))
+                if (Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase, RegexMatchTimeout))
                     return true;
 
                 // Try matching each path segment (only for non-root-relative patterns)
                 var segments = relativePath.Split('/');
                 foreach (var segment in segments)
                 {
-                    if (Regex.IsMatch(segment, regexPattern, RegexOptions.IgnoreCase))
+                    if (Regex.IsMatch(segment, regexPattern, RegexOptions.IgnoreCase, RegexMatchTimeout))
                         return true;
                 }
             }
             catch
             {
-                // Invalid regex pattern, fall back to simple matching
+                // Invalid regex pattern or timeout, fall back to simple matching
                 return SimpleMatch(pattern, relativePath, fileName, isRootRelative);
             }
+
 
             return false;
         }
@@ -313,8 +344,9 @@ namespace Grex.Services
                 var regexPattern = "^" + Regex.Escape(pattern)
                     .Replace("\\*", ".*")
                     .Replace("\\?", ".") + "$";
-                return Regex.IsMatch(relativePath, regexPattern, RegexOptions.IgnoreCase) ||
-                       Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase);
+                return Regex.IsMatch(relativePath, regexPattern, RegexOptions.IgnoreCase, RegexMatchTimeout) ||
+                       Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase, RegexMatchTimeout);
+
             }
 
             // For patterns without wildcards, match exactly (not as substring)

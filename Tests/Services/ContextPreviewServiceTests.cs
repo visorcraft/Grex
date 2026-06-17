@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
 using Grex.Services;
@@ -196,6 +197,19 @@ namespace Grex.Tests.Services
             // Act & Assert
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 _service.GetContextAsync(nonExistentPath, lineNumber: 1));
+        }
+
+        [Fact]
+        public async Task GetContextAsync_WithCancellation_ThrowsOperationCanceledException()
+        {
+            // Arrange
+            var filePath = CreateTestFile("huge.txt", new string('x', 1024 * 1024));
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            // Act & Assert
+            await Assert.ThrowsAsync<OperationCanceledException>(() =>
+                _service.GetContextAsync(filePath, lineNumber: 1, cancellationToken: cts.Token));
         }
 
         [Theory]

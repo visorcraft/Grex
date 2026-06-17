@@ -37,19 +37,7 @@ namespace Grex.ViewModels
             }
         }
 
-        private static void Log(string message)
-        {
-            try
-            {
-                var logFile = Path.Combine(Path.GetTempPath(), "Grex.log");
-                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                File.AppendAllText(logFile, $"[{timestamp}] {message}\n");
-            }
-            catch
-            {
-                // Ignore logging errors
-            }
-        }
+        private static void Log(string message) => LogService.Write(message);
 
         public ObservableCollection<TabViewModel> Tabs { get; }
 

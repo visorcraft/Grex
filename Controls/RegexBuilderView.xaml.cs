@@ -17,7 +17,10 @@ namespace Grex.Controls
 {
     public sealed partial class RegexBuilderView : UserControl
     {
+        private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromSeconds(2);
+
         private Regex? _currentRegex;
+
         private bool _isUpdating = false;
         private readonly ILocalizationService _localizationService = LocalizationService.Instance;
         private bool _areToolTipsRegistered;
@@ -375,7 +378,7 @@ namespace Grex.Controls
                     options |= RegexOptions.Multiline;
                 }
 
-                _currentRegex = new Regex(pattern, options);
+                _currentRegex = new Regex(pattern, options, RegexMatchTimeout);
             }
             catch (ArgumentException)
             {
@@ -556,7 +559,8 @@ namespace Grex.Controls
             try
             {
                 // Validate pattern first
-                var testRegex = new Regex(pattern);
+                var testRegex = new Regex(pattern, RegexOptions.None, RegexMatchTimeout);
+
                 
                 // Parse and display breakdown
                 var breakdown = ParseRegexBreakdown(pattern);

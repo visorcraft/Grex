@@ -229,6 +229,31 @@ namespace Grex.Tests.Services
                 result.Encoding.Should().NotBeNull();
             }
         }
+
+        [Fact]
+        public void DetectFileEncoding_WithLargeFile_DoesNotThrowAndReturnsResult()
+        {
+            // Arrange
+            var testDirectory = TestDataHelper.CreateTestDirectory();
+            var testFile = Path.Combine(testDirectory, "large.txt");
+            var largeText = new string('a', 1024 * 1024); // 1 MB of ASCII text
+            File.WriteAllText(testFile, largeText, Encoding.UTF8);
+
+            try
+            {
+                // Act
+                var result = _service.DetectFileEncoding(testFile);
+
+                // Assert
+                result.Should().NotBeNull();
+                result.Encoding.Should().NotBeNull();
+            }
+            finally
+            {
+                TestDataHelper.CleanupTestDirectory(testDirectory);
+            }
+        }
     }
 }
+
 

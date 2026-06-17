@@ -17,8 +17,6 @@ namespace Grex.Services
     /// </summary>
     public class ContextMenuService
     {
-        private static readonly string LogFilePath = Path.Combine(Path.GetTempPath(), "Grex.log");
-
         #region Private Fields
 
         private readonly NotificationService _notificationService;
@@ -591,18 +589,7 @@ namespace Grex.Services
         /// <summary>
         /// Logs a message to the Grex log file.
         /// </summary>
-        private static void Log(string message)
-        {
-            try
-            {
-                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                File.AppendAllText(LogFilePath, $"[{timestamp}] ContextMenuService: {message}\n");
-            }
-            catch
-            {
-                // Ignore logging errors to prevent infinite loops
-            }
-        }
+        private static void Log(string message) => LogService.Write($"ContextMenuService: {message}");
 
         #endregion
     }

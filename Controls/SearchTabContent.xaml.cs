@@ -34,6 +34,9 @@ namespace Grex.Controls
         private readonly AiSearchService _aiSearchService = new AiSearchService();
         private readonly ObservableCollection<AiChatMessage> _aiChatMessages = new ObservableCollection<AiChatMessage>();
         private readonly List<AiConversationTurn> _aiConversationHistory = new List<AiConversationTurn>();
+        private const int MaxAiChatMessages = 200; // cap both UI list and conversation payload
+        private static readonly TimeSpan RegexValidationTimeout = TimeSpan.FromSeconds(2);
+
         private CancellationTokenSource? _aiRequestCancellationTokenSource;
         private bool _isCurrentOperationReplace = false; // Tracks whether the current operation is a Replace
         private bool _isAiModeActive = false;
@@ -327,19 +330,7 @@ namespace Grex.Controls
         }
 
 
-        private static void Log(string message)
-        {
-            try
-            {
-                var logFile = Path.Combine(Path.GetTempPath(), "Grex.log");
-                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                File.AppendAllText(logFile, $"[{timestamp}] {message}\n");
-            }
-            catch
-            {
-                // Ignore logging errors
-            }
-        }
+        private static void Log(string message) => LogService.Write(message);
 
         private void SearchTabContent_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args)
         {
@@ -454,10 +445,21 @@ namespace Grex.Controls
             // Unsubscribe from theme changes
             MainWindow.ThemeChanged -= OnThemeChanged;
 
+            // Cancel any in-flight AI request and dispose the per-tab HttpClient
             _aiRequestCancellationTokenSource?.Cancel();
             _aiRequestCancellationTokenSource?.Dispose();
             _aiRequestCancellationTokenSource = null;
             _isAiRequestInFlight = false;
+            // Do not dispose _aiSearchService here: it shares a singleton HttpClient
+            // and disposing it would either do nothing or break reuse.
+
+            // Detach from the ViewModel so the control can be garbage collected
+            UnbindViewModel();
+
+            // Detach double-tap handlers from realized containers so recycled items
+            // don't keep this control alive.
+            DetachDoubleTappedHandlers(ResultsListView);
+            DetachDoubleTappedHandlers(FilesResultsListView);
              
             if (!_isLocalizationSubscribed)
             {
@@ -467,6 +469,7 @@ namespace Grex.Controls
             _localizationService.PropertyChanged -= LocalizationService_PropertyChanged;
             _isLocalizationSubscribed = false;
         }
+
         
         private void OnThemeChanged(object? sender, ThemeChangedEventArgs e)
         {
@@ -1966,7 +1969,10 @@ namespace Grex.Controls
             // The Regex constructor should throw ArgumentException for invalid patterns
             try
             {
-                var regex = new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.None);
+                var regex = new System.Text.RegularExpressions.Regex(
+                    pattern,
+                    System.Text.RegularExpressions.RegexOptions.None,
+                    RegexValidationTimeout);
                 // Also try to match an empty string to catch any runtime issues
                 regex.IsMatch("");
                 return true;
@@ -2146,8 +2152,10 @@ namespace Grex.Controls
                 Role = "user",
                 Content = userTurn
             });
+            TrimAiConversationHistory();
 
             _isAiRequestInFlight = true;
+
             UpdateSearchButtonState();
 
             _aiRequestCancellationTokenSource?.Cancel();
@@ -2180,9 +2188,11 @@ namespace Grex.Controls
                         Role = "assistant",
                         Content = assistantMessage
                     });
+                    TrimAiConversationHistory();
                 }
                 else
                 {
+
                     AppendAiMessage(
                         role: "assistant",
                         content: GetString("AiSearchRequestFailedMessage", response.ErrorMessage),
@@ -2227,6 +2237,7 @@ namespace Grex.Controls
             };
 
             _aiChatMessages.Add(chatMessage);
+            TrimAiChatMessages();
             UpdateAiChatEmptyState();
 
             if (AiMessagesListView != null)
@@ -2236,7 +2247,26 @@ namespace Grex.Controls
             }
         }
 
+        private void TrimAiChatMessages()
+        {
+            // Prevent long AI discussions from growing memory/payloads without bound.
+            while (_aiChatMessages.Count > MaxAiChatMessages)
+            {
+                _aiChatMessages.RemoveAt(0);
+            }
+        }
+
+        private void TrimAiConversationHistory()
+        {
+            // The conversation history sent to the AI is capped separately from the UI list.
+            while (_aiConversationHistory.Count > MaxAiChatMessages)
+            {
+                _aiConversationHistory.RemoveAt(0);
+            }
+        }
+
         private IReadOnlyList<string> BuildAiFilterSuggestions()
+
         {
             var suggestions = new List<string>();
 
@@ -2987,6 +3017,9 @@ namespace Grex.Controls
                     Log("BindViewModel: Control not loaded yet, skipping");
                     return;
                 }
+
+                // Prevent duplicate PropertyChanged subscriptions when a tab is re-selected.
+                UnbindViewModel();
 
                 // Sync UI with ViewModel - with null checks
                  if (PathAutoSuggestBox != null)
@@ -3899,6 +3932,27 @@ namespace Grex.Controls
             else
             {
                 Log($"ListViewItem_DoubleTapped: Could not find ListViewItem from sender: {sender?.GetType().Name ?? "null"}");
+            }
+        }
+
+        private void DetachDoubleTappedHandlers(ListView? listView)
+        {
+            if (listView?.ItemsPanelRoot is not Panel panel)
+            {
+                return;
+            }
+
+            foreach (var child in panel.Children.OfType<ListViewItem>())
+            {
+                child.DoubleTapped -= ListViewItem_DoubleTapped;
+                if (child.ContentTemplateRoot is Microsoft.UI.Xaml.Controls.Border border)
+                {
+                    border.DoubleTapped -= ListViewItem_DoubleTapped;
+                    if (border.Child is Microsoft.UI.Xaml.Controls.Grid grid)
+                    {
+                        grid.DoubleTapped -= ListViewItem_DoubleTapped;
+                    }
+                }
             }
         }
 

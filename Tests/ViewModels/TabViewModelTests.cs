@@ -36,9 +36,9 @@ namespace Grex.Tests.ViewModels
             // Act & Assert
             _tabViewModel.TabTitle.Should().Be("Test Tab");
             _tabViewModel.SearchResults.Should().NotBeNull();
-            _tabViewModel.SearchResults.Should().BeOfType<ObservableCollection<SearchResult>>();
+            _tabViewModel.SearchResults.Should().BeAssignableTo<ObservableCollection<SearchResult>>();
             _tabViewModel.FileSearchResults.Should().NotBeNull();
-            _tabViewModel.FileSearchResults.Should().BeOfType<ObservableCollection<FileSearchResult>>();
+            _tabViewModel.FileSearchResults.Should().BeAssignableTo<ObservableCollection<FileSearchResult>>();
             _tabViewModel.StatusText.Should().Be(L("ReadyStatus"));
             _tabViewModel.IsSearching.Should().BeFalse();
             _tabViewModel.CanSearch.Should().BeFalse();

@@ -13,7 +13,6 @@ namespace Grex.Services
         private static NotificationService? _instance;
         private static readonly object _lock = new object();
         private static readonly object _registrationLock = new object();
-        private static readonly string LogFilePath = Path.Combine(Path.GetTempPath(), "Grex.log");
 
         private bool? _isSupported;
         private string? _supportFailureDetails;
@@ -278,19 +277,7 @@ namespace Grex.Services
                 .Replace("'", "&apos;");
         }
 
-        private static void LogToFile(string message)
-        {
-            try
-            {
-                var logFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Grex.log");
-                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                System.IO.File.AppendAllText(logFile, $"[{timestamp}] {message}\n");
-            }
-            catch
-            {
-                // Ignore logging errors to prevent infinite loops
-            }
-        }
+        private static void LogToFile(string message) => LogService.Write(message);
 
         /// <summary>
         /// Initializes notification support/registration (call during app startup).

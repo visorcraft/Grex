@@ -9,12 +9,19 @@ namespace Grex.Services
 {
     public static class SearchProfilesService
     {
-        private static readonly string ProfilesFile = Path.Combine(
+        private static string ProfilesFile = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Grex",
             "search_profiles.json"
         );
 
+        internal static string ProfilesFilePath
+        {
+            get => ProfilesFile;
+            set => ProfilesFile = value;
+        }
+
+        private const int MaxProfiles = 50;
         private static readonly object _lock = new object();
 
         public static List<SearchProfile> GetProfiles()
@@ -98,6 +105,12 @@ namespace Grex.Services
                         profile.CreatedAt = profile.CreatedAt == default ? now : profile.CreatedAt;
                         profile.UpdatedAt = now;
                         profiles.Insert(0, profile);
+                    }
+
+                    // Keep the profile list bounded so the JSON file and memory don't grow forever.
+                    if (profiles.Count > MaxProfiles)
+                    {
+                        profiles.RemoveRange(MaxProfiles, profiles.Count - MaxProfiles);
                     }
 
                     var json = JsonSerializer.Serialize(profiles, new JsonSerializerOptions { WriteIndented = true });

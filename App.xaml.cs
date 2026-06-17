@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Threading.Tasks;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -10,8 +9,6 @@ namespace Grex
 {
     public partial class App : Application
     {
-        private static readonly string LogFile = Path.Combine(Path.GetTempPath(), "Grex.log");
-
         public App()
         {
             try
@@ -271,18 +268,7 @@ namespace Grex
         
         public static MainWindow? MainWindowInstance { get; private set; }
 
-        private static void Log(string message)
-        {
-            try
-            {
-                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                File.AppendAllText(LogFile, $"[{timestamp}] {message}\n");
-            }
-            catch
-            {
-                // Ignore logging errors
-            }
-        }
+        private static void Log(string message) => LogService.Write(message);
 
         private static string GetString(string key) =>
             Services.LocalizationService.Instance.GetLocalizedString(key);

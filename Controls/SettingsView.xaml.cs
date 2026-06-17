@@ -39,12 +39,11 @@ namespace Grex.Controls
             InitializeUILanguageComboBox();
             LoadSettings();
             this.Loaded += SettingsView_Loaded;
-            
-            // Subscribe to localization service culture changes to refresh UI
-            LocalizationService.Instance.PropertyChanged += LocalizationService_PropertyChanged;
+            this.Unloaded += SettingsView_Unloaded;
             
             // Subscribe to dropdown open/close events to allow keyboard navigation within dropdowns
             // This prevents SelectionChanged from triggering full UI refresh while navigating with keyboard
+
             UILanguageComboBox.DropDownOpened += UILanguageComboBox_DropDownOpened;
             UILanguageComboBox.DropDownClosed += UILanguageComboBox_DropDownClosed;
             CultureComboBox.DropDownOpened += CultureComboBox_DropDownOpened;
@@ -844,11 +843,15 @@ namespace Grex.Controls
             // Update ComboBox items and other elements to ensure proper localization
             UpdateSettingsViewElements(LocalizationService.Instance);
             
+            // Subscribe to localization changes (re-subscribe each time the view is shown)
+            LocalizationService.Instance.PropertyChanged -= LocalizationService_PropertyChanged;
+            LocalizationService.Instance.PropertyChanged += LocalizationService_PropertyChanged;
+            
             // Subscribe to theme changes and apply initial theme
             MainWindow.ThemeChanged += OnThemeChanged;
-            this.Unloaded += SettingsView_Unloaded;
             
             // Delay theme application to ensure visual tree is fully populated
+
             DispatcherQueue?.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
             {
                 ApplyCurrentThemeColors();
@@ -859,7 +862,17 @@ namespace Grex.Controls
         {
             // Unsubscribe from theme changes
             MainWindow.ThemeChanged -= OnThemeChanged;
+            
+            // Unsubscribe from localization changes so a recreated view does not leak
+            LocalizationService.Instance.PropertyChanged -= LocalizationService_PropertyChanged;
+            
+            // Unsubscribe dropdown events
+            UILanguageComboBox.DropDownOpened -= UILanguageComboBox_DropDownOpened;
+            UILanguageComboBox.DropDownClosed -= UILanguageComboBox_DropDownClosed;
+            CultureComboBox.DropDownOpened -= CultureComboBox_DropDownOpened;
+            CultureComboBox.DropDownClosed -= CultureComboBox_DropDownClosed;
         }
+
         
         private void OnThemeChanged(object? sender, ThemeChangedEventArgs e)
         {
@@ -2397,8 +2410,7 @@ namespace Grex.Controls
                 {
                     Directory.CreateDirectory(logDir);
                 }
-                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-                File.AppendAllText(logFile, $"[{timestamp}] {message}\n");
+                LogService.Write(message, logFile);
             }
             catch
             {

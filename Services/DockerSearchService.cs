@@ -46,8 +46,23 @@ namespace Grex.Services
                 throw new InvalidOperationException("Failed to start docker process.");
             }
 
-            var outputTask = process.StandardOutput.ReadToEndAsync();
-            var errorTask = process.StandardError.ReadToEndAsync();
+            using var registration = cancellationToken.Register(() =>
+            {
+                try
+                {
+                    if (!process.HasExited)
+                    {
+                        process.Kill(entireProcessTree: true);
+                    }
+                }
+                catch
+                {
+                    // Ignore errors when killing process
+                }
+            });
+
+            var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
 
             await process.WaitForExitAsync(cancellationToken);
 
@@ -88,7 +103,10 @@ namespace Grex.Services
     {
         private const string DockerExecutable = "docker";
         private const int MatchPreviewMaxChars = 400;
+        private const int MaxGrepAvailabilityCacheEntries = 50;
         private static readonly TimeSpan DefaultMirrorRetention = TimeSpan.FromHours(6);
+        private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromSeconds(5);
+
 
         public static DockerSearchService Instance { get; } = new();
 
@@ -149,6 +167,7 @@ namespace Grex.Services
                 if (client == null)
                 {
                     _grepAvailabilityCache[containerId] = false;
+                    TrimGrepAvailabilityCache();
                     return false;
                 }
 
@@ -167,11 +186,13 @@ namespace Grex.Services
                 
                 var isAvailable = inspectResult.ExitCode == 0 && !string.IsNullOrWhiteSpace(stdout);
                 _grepAvailabilityCache[containerId] = isAvailable;
+                TrimGrepAvailabilityCache();
                 return isAvailable;
             }
             catch
             {
                 _grepAvailabilityCache[containerId] = false;
+                TrimGrepAvailabilityCache();
                 return false;
             }
         }
@@ -188,6 +209,21 @@ namespace Grex.Services
             else
             {
                 _grepAvailabilityCache.Clear();
+            }
+        }
+
+        private void TrimGrepAvailabilityCache()
+        {
+            if (_grepAvailabilityCache.Count <= MaxGrepAvailabilityCacheEntries)
+            {
+                return;
+            }
+
+            // Take a snapshot of keys to remove so we don't mutate the dictionary while enumerating.
+            var keysToRemove = _grepAvailabilityCache.Keys.Take(_grepAvailabilityCache.Count - MaxGrepAvailabilityCacheEntries).ToList();
+            foreach (var key in keysToRemove)
+            {
+                _grepAvailabilityCache.TryRemove(key, out _);
             }
         }
 
@@ -516,14 +552,16 @@ namespace Grex.Services
             Regex? compiledRegex = null;
             if (isRegex)
             {
-                var options = RegexOptions.Compiled;
+                // Do not use RegexOptions.Compiled for dynamic user patterns: it leaks into
+                // .NET's static compiled-regex cache. Apply a timeout to prevent hangs.
+                var options = RegexOptions.None;
                 if (!caseSensitive)
                 {
                     options |= RegexOptions.IgnoreCase;
                 }
                 try
                 {
-                    compiledRegex = new Regex(searchTerm, options);
+                    compiledRegex = new Regex(searchTerm, options, RegexMatchTimeout);
                 }
                 catch
                 {
@@ -536,7 +574,8 @@ namespace Grex.Services
             string? line;
             // Regex to match grep output: filename:line_number:content
             // Handle filenames that may contain colons (Windows-style paths in containers are unlikely but possible)
-            var grepLineRegex = new Regex(@"^(.+?):(\d+):(.*)$", RegexOptions.Compiled);
+            var grepLineRegex = new Regex(@"^(.+?):(\d+):(.*)$", RegexOptions.None, RegexMatchTimeout);
+
 
             while ((line = reader.ReadLine()) != null)
             {
@@ -599,10 +638,17 @@ namespace Grex.Services
 
             if (isRegex && compiledRegex != null)
             {
-                var match = compiledRegex.Match(line);
-                if (match.Success)
+                try
                 {
-                    return match.Index + 1;
+                    var match = compiledRegex.Match(line);
+                    if (match.Success)
+                    {
+                        return match.Index + 1;
+                    }
+                }
+                catch
+                {
+                    return 1;
                 }
             }
             else
@@ -617,6 +663,7 @@ namespace Grex.Services
 
             return 1;
         }
+
 
         private static (string before, string match, string after) BuildMatchPreviewSegments(
             string line,
@@ -782,7 +829,14 @@ namespace Grex.Services
 
             if (isRegex && compiledRegex != null)
             {
-                return compiledRegex.Matches(line).Count;
+                try
+                {
+                    return compiledRegex.Matches(line).Count;
+                }
+                catch
+                {
+                    return 1;
+                }
             }
             else
             {
@@ -794,6 +848,7 @@ namespace Grex.Services
                     count++;
                     index += searchTerm.Length;
                 }
+
                 return Math.Max(count, 1); // At least 1 if grep found a match
             }
         }
@@ -865,7 +920,7 @@ namespace Grex.Services
                 .Replace("\\*", ".*")
                 .Replace("\\?", ".") + "$";
 
-            return Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase);
+            return Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase, RegexMatchTimeout);
         }
 
         /// <summary>
@@ -906,7 +961,7 @@ namespace Grex.Services
             {
                 try
                 {
-                    var regex = new Regex(excludeDirs, RegexOptions.IgnoreCase);
+                    var regex = new Regex(excludeDirs, RegexOptions.IgnoreCase, RegexMatchTimeout);
                     // Check each directory component in the path
                     var parts = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
                     foreach (var part in parts)
@@ -917,10 +972,11 @@ namespace Grex.Services
                 }
                 catch
                 {
-                    // If regex is invalid, fall back to literal matching
+                    // If regex is invalid or times out, fall back to literal matching
                     isRegex = false;
                 }
             }
+
 
             if (!isRegex)
             {
@@ -1099,12 +1155,13 @@ namespace Grex.Services
 
             try
             {
-                return Regex.IsMatch(text, regexPattern, RegexOptions.IgnoreCase);
+                return Regex.IsMatch(text, regexPattern, RegexOptions.IgnoreCase, RegexMatchTimeout);
             }
             catch
             {
                 return false;
             }
+
         }
 
         public async Task<IReadOnlyList<DockerContainerInfo>> GetContainersAsync(CancellationToken cancellationToken = default)

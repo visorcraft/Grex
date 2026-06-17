@@ -19,8 +19,16 @@ namespace Grex.Services
         // Maximum degree of parallelism for file searching
         private const int MaxParallelism = 8;
         private const int MatchPreviewMaxChars = 400;
+        private const long MaxReplaceFileSizeBytes = 100 * 1024 * 1024; // 100 MB
+        private const long MaxPdfBytes = 50 * 1024 * 1024; // 50 MB
+        
+        // Guard against user-supplied regexes that can catastrophically backtrack.
+        // Compiled regexes for dynamic patterns leak into a static, unbounded .NET cache,
+        // so we intentionally do NOT use RegexOptions.Compiled here.
+        private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromSeconds(10);
         
         // File extensions to skip (binary files)
+
         // Note: Common text files like .env, .gitignore, .gitattributes, etc. are NOT in this list
         // and will be treated as text files
         private static readonly HashSet<string> BinaryExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -154,17 +162,18 @@ namespace Grex.Services
             {
                 try
                 {
-                    var regexOptions = RegexOptions.Compiled;
+                    var regexOptions = RegexOptions.None;
                     if (!searchCaseSensitive)
                     {
                         regexOptions |= RegexOptions.IgnoreCase;
                     }
-                    compiledRegex = new Regex(searchTerm, regexOptions);
+                    compiledRegex = new Regex(searchTerm, regexOptions, RegexMatchTimeout);
                 }
                 catch (ArgumentException ex)
                 {
                     throw new ArgumentException($"Invalid regex pattern: {ex.Message}");
                 }
+
             }
 
             // Configure enumeration options
@@ -428,7 +437,8 @@ namespace Grex.Services
                 try
                 {
                     ct.ThrowIfCancellationRequested();
-                    var fileResults = await SearchFileOptimizedAsync(file, searchTerm, isRegex, compiledRegex, searchCaseSensitive, path, stringComparisonMode, unicodeNormalizationMode, diacriticSensitive, culture);
+                    var fileResults = await SearchFileOptimizedAsync(file, searchTerm, isRegex, compiledRegex, searchCaseSensitive, path, stringComparisonMode, unicodeNormalizationMode, diacriticSensitive, culture, ct);
+
                     foreach (var result in fileResults)
                     {
                         ct.ThrowIfCancellationRequested();
@@ -449,7 +459,7 @@ namespace Grex.Services
             return results.OrderBy(r => r.FileName).ThenBy(r => r.LineNumber).ToList();
         }
 
-        private async Task<List<SearchResult>> SearchFileOptimizedAsync(string filePath, string searchTerm, bool isRegex, Regex? compiledRegex, bool searchCaseSensitive, string rootPath, Models.StringComparisonMode stringComparisonMode, Models.UnicodeNormalizationMode unicodeNormalizationMode, bool diacriticSensitive, string? culture)
+        private async Task<List<SearchResult>> SearchFileOptimizedAsync(string filePath, string searchTerm, bool isRegex, Regex? compiledRegex, bool searchCaseSensitive, string rootPath, Models.StringComparisonMode stringComparisonMode, Models.UnicodeNormalizationMode unicodeNormalizationMode, bool diacriticSensitive, string? culture, CancellationToken cancellationToken = default)
         {
             var results = new List<SearchResult>();
             var fileName = Path.GetFileName(filePath);
@@ -458,8 +468,9 @@ namespace Grex.Services
             // Check if this is a searchable binary file
             if (SearchableBinaryExtensions.Contains(extension))
             {
-                return await SearchBinaryFileAsync(filePath, searchTerm, isRegex, compiledRegex, searchCaseSensitive, rootPath, extension, stringComparisonMode, unicodeNormalizationMode, diacriticSensitive, culture);
+                return await SearchBinaryFileAsync(filePath, searchTerm, isRegex, compiledRegex, searchCaseSensitive, rootPath, extension, stringComparisonMode, unicodeNormalizationMode, diacriticSensitive, culture, cancellationToken);
             }
+
             
             try
             {
@@ -468,9 +479,10 @@ namespace Grex.Services
                 using var reader = new StreamReader(filePath, encodingResult.Encoding, detectEncodingFromByteOrderMarks: false);
                 int lineNumber = 0;
                 
-                while (await reader.ReadLineAsync() is { } line)
+                while (await reader.ReadLineAsync(cancellationToken) is { } line)
                 {
                     lineNumber++;
+
                     bool matches;
 
                     // Use original line for searching
@@ -537,7 +549,7 @@ namespace Grex.Services
             return results;
         }
 
-        private async Task<List<SearchResult>> SearchBinaryFileAsync(string filePath, string searchTerm, bool isRegex, Regex? compiledRegex, bool searchCaseSensitive, string rootPath, string extension, Models.StringComparisonMode stringComparisonMode, Models.UnicodeNormalizationMode unicodeNormalizationMode, bool diacriticSensitive, string? culture)
+        private async Task<List<SearchResult>> SearchBinaryFileAsync(string filePath, string searchTerm, bool isRegex, Regex? compiledRegex, bool searchCaseSensitive, string rootPath, string extension, Models.StringComparisonMode stringComparisonMode, Models.UnicodeNormalizationMode unicodeNormalizationMode, bool diacriticSensitive, string? culture, CancellationToken cancellationToken = default)
         {
             var results = new List<SearchResult>();
             var fileName = Path.GetFileName(filePath);
@@ -554,18 +566,23 @@ namespace Grex.Services
                     extension.Equals(".odp", StringComparison.OrdinalIgnoreCase))
                 {
                     // ZIP-based formats (Office Open XML and OpenDocument)
-                    results = await SearchZipBasedFileAsync(filePath, searchTerm, isRegex, compiledRegex, searchCaseSensitive, rootPath, stringComparisonMode, unicodeNormalizationMode, diacriticSensitive, culture);
+                    results = await SearchZipBasedFileAsync(filePath, searchTerm, isRegex, compiledRegex, searchCaseSensitive, rootPath, stringComparisonMode, unicodeNormalizationMode, diacriticSensitive, culture, cancellationToken);
                 }
                 else if (extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
                 {
                     // PDF files - extract text and search
-                    results = await SearchPdfFileAsync(filePath, searchTerm, isRegex, compiledRegex, searchCaseSensitive, rootPath, stringComparisonMode, unicodeNormalizationMode, diacriticSensitive, culture);
+                    results = await SearchPdfFileAsync(filePath, searchTerm, isRegex, compiledRegex, searchCaseSensitive, rootPath, stringComparisonMode, unicodeNormalizationMode, diacriticSensitive, culture, cancellationToken);
                 }
                 else if (extension.Equals(".rtf", StringComparison.OrdinalIgnoreCase))
                 {
                     // RTF files - text-based format
-                    results = await SearchRtfFileAsync(filePath, searchTerm, isRegex, compiledRegex, searchCaseSensitive, rootPath, stringComparisonMode, unicodeNormalizationMode, diacriticSensitive, culture);
+                    results = await SearchRtfFileAsync(filePath, searchTerm, isRegex, compiledRegex, searchCaseSensitive, rootPath, stringComparisonMode, unicodeNormalizationMode, diacriticSensitive, culture, cancellationToken);
                 }
+            }
+
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -576,8 +593,9 @@ namespace Grex.Services
             return results;
         }
 
-        private async Task<List<SearchResult>> SearchZipBasedFileAsync(string filePath, string searchTerm, bool isRegex, Regex? compiledRegex, bool searchCaseSensitive, string rootPath, Models.StringComparisonMode stringComparisonMode, Models.UnicodeNormalizationMode unicodeNormalizationMode, bool diacriticSensitive, string? culture)
+        private async Task<List<SearchResult>> SearchZipBasedFileAsync(string filePath, string searchTerm, bool isRegex, Regex? compiledRegex, bool searchCaseSensitive, string rootPath, Models.StringComparisonMode stringComparisonMode, Models.UnicodeNormalizationMode unicodeNormalizationMode, bool diacriticSensitive, string? culture, CancellationToken cancellationToken = default)
         {
+
             var results = new List<SearchResult>();
             var fileName = Path.GetFileName(filePath);
             
@@ -600,9 +618,10 @@ namespace Grex.Services
                             using var reader = new StreamReader(entryStream, Encoding.UTF8);
                             
                             int lineNumber = 0;
-                            while (await reader.ReadLineAsync() is { } line)
+                            while (await reader.ReadLineAsync(cancellationToken) is { } line)
                             {
                                 lineNumber++;
+
                                 bool matches;
 
                                 if (isRegex && compiledRegex != null)
@@ -645,6 +664,10 @@ namespace Grex.Services
                                 }
                             }
                         }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
                         catch
                         {
                             // Skip entries that can't be read
@@ -652,6 +675,10 @@ namespace Grex.Services
                         }
                     }
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch
             {
@@ -661,22 +688,31 @@ namespace Grex.Services
             return results;
         }
 
-        private async Task<List<SearchResult>> SearchPdfFileAsync(string filePath, string searchTerm, bool isRegex, Regex? compiledRegex, bool searchCaseSensitive, string rootPath, Models.StringComparisonMode stringComparisonMode, Models.UnicodeNormalizationMode unicodeNormalizationMode, bool diacriticSensitive, string? culture)
+        private async Task<List<SearchResult>> SearchPdfFileAsync(string filePath, string searchTerm, bool isRegex, Regex? compiledRegex, bool searchCaseSensitive, string rootPath, Models.StringComparisonMode stringComparisonMode, Models.UnicodeNormalizationMode unicodeNormalizationMode, bool diacriticSensitive, string? culture, CancellationToken cancellationToken = default)
         {
             var results = new List<SearchResult>();
             var fileName = Path.GetFileName(filePath);
             
             try
             {
+                // Avoid loading very large PDFs into memory.
+                var pdfFileInfo = new FileInfo(filePath);
+                if (pdfFileInfo.Length > MaxPdfBytes)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Skipping PDF search for oversized file {filePath} ({pdfFileInfo.Length} bytes)");
+                    return results;
+                }
+
                 // Read PDF as binary and extract text streams
                 // PDFs contain text in streams between "stream" and "endstream" markers
-                var pdfBytes = await File.ReadAllBytesAsync(filePath);
+                var pdfBytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
+
                 var pdfText = Encoding.UTF8.GetString(pdfBytes);
                 
                 // Extract text from PDF streams (simplified approach)
                 // Look for text between stream markers or in text objects
                 var textMatches = new List<string>();
-                var streamPattern = new Regex(@"stream\s*(.*?)\s*endstream", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+                var streamPattern = new Regex(@"stream\s*(.*?)\s*endstream", RegexOptions.Singleline | RegexOptions.IgnoreCase, RegexMatchTimeout);
                 var streamMatches = streamPattern.Matches(pdfText);
                 
                 foreach (Match match in streamMatches)
@@ -693,7 +729,7 @@ namespace Grex.Services
                 }
                 
                 // Also search the raw PDF text for text objects
-                var textObjectPattern = new Regex(@"/Type\s*/Text[^>]*>([^<]+)", RegexOptions.IgnoreCase);
+                var textObjectPattern = new Regex(@"/Type\s*/Text[^>]*>([^<]+)", RegexOptions.IgnoreCase, RegexMatchTimeout);
                 var textObjectMatches = textObjectPattern.Matches(pdfText);
                 foreach (Match match in textObjectMatches)
                 {
@@ -758,6 +794,10 @@ namespace Grex.Services
                     }
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch
             {
                 // If PDF can't be read, skip it
@@ -766,8 +806,9 @@ namespace Grex.Services
             return results;
         }
 
-        private async Task<List<SearchResult>> SearchRtfFileAsync(string filePath, string searchTerm, bool isRegex, Regex? compiledRegex, bool searchCaseSensitive, string rootPath, Models.StringComparisonMode stringComparisonMode, Models.UnicodeNormalizationMode unicodeNormalizationMode, bool diacriticSensitive, string? culture)
+        private async Task<List<SearchResult>> SearchRtfFileAsync(string filePath, string searchTerm, bool isRegex, Regex? compiledRegex, bool searchCaseSensitive, string rootPath, Models.StringComparisonMode stringComparisonMode, Models.UnicodeNormalizationMode unicodeNormalizationMode, bool diacriticSensitive, string? culture, CancellationToken cancellationToken = default)
         {
+
             var results = new List<SearchResult>();
             var fileName = Path.GetFileName(filePath);
             
@@ -778,9 +819,10 @@ namespace Grex.Services
                 using var reader = new StreamReader(filePath, Encoding.UTF8);
                 int lineNumber = 0;
                 
-                while (await reader.ReadLineAsync() is { } line)
+                while (await reader.ReadLineAsync(cancellationToken) is { } line)
                 {
                     lineNumber++;
+
                     
                     // Extract readable text from RTF (remove control codes)
                     var readableText = ExtractRtfText(line);
@@ -825,6 +867,10 @@ namespace Grex.Services
                         });
                     }
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch
             {
@@ -950,14 +996,14 @@ namespace Grex.Services
             
             process.Start();
 
-            var output = await process.StandardOutput.ReadToEndAsync();
+            var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
             await process.WaitForExitAsync(cancellationToken);
             
             cancellationToken.ThrowIfCancellationRequested();
 
             if (process.ExitCode != 0 && process.ExitCode != 1)
             {
-                var error = await process.StandardError.ReadToEndAsync();
+                var error = await process.StandardError.ReadToEndAsync(cancellationToken);
                 var errorMessage = $"WSL grep error: {error}";
                 // Log and show notification for WSL errors
                 System.Diagnostics.Debug.WriteLine(errorMessage);
@@ -1002,7 +1048,7 @@ namespace Grex.Services
                     {
                         try
                         {
-                            var regex = new Regex(excludeDirs, RegexOptions.IgnoreCase);
+                            var regex = new Regex(excludeDirs, RegexOptions.IgnoreCase, RegexMatchTimeout);
                             foreach (var part in parts)
                             {
                                 if (regex.IsMatch(part))
@@ -1330,13 +1376,14 @@ namespace Grex.Services
             Regex? compiledRegex = null;
             if (isRegex)
             {
-                var options = RegexOptions.Compiled;
+                var options = RegexOptions.None;
                 if (!searchCaseSensitive)
                 {
                     options |= RegexOptions.IgnoreCase;
                 }
-                compiledRegex = new Regex(searchTerm, options);
+                compiledRegex = new Regex(searchTerm, options, RegexMatchTimeout);
             }
+
 
             foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
@@ -1387,10 +1434,18 @@ namespace Grex.Services
 
             if (isRegex && compiledRegex != null)
             {
-                var match = compiledRegex.Match(line);
-                if (match.Success)
+                try
                 {
-                    return match.Index + 1;
+                    var match = compiledRegex.Match(line);
+                    if (match.Success)
+                    {
+                        return match.Index + 1;
+                    }
+                }
+                catch
+                {
+                    // Regex timed out or failed; fall back to default column.
+                    return 1;
                 }
             }
             else
@@ -1405,6 +1460,7 @@ namespace Grex.Services
 
             return 1;
         }
+
 
         private static (string before, string match, string after) BuildMatchPreviewSegments(
             string line,
@@ -1533,8 +1589,16 @@ namespace Grex.Services
 
             if (isRegex && compiledRegex != null)
             {
-                var matches = compiledRegex.Matches(line);
-                return matches.Count;
+                try
+                {
+                    var matches = compiledRegex.Matches(line);
+                    return matches.Count;
+                }
+                catch
+                {
+                    // Regex timed out or failed; the line matched, so report one match.
+                    return 1;
+                }
             }
             else
             {
@@ -1548,6 +1612,7 @@ namespace Grex.Services
                 }
                 return Math.Max(count, 1); // Return at least 1 since we know the line matches
             }
+
         }
 
         /// <summary>
@@ -1799,13 +1864,14 @@ namespace Grex.Services
 
             try
             {
-                return Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase);
+                return Regex.IsMatch(fileName, regexPattern, RegexOptions.IgnoreCase, RegexMatchTimeout);
             }
             catch
             {
                 // If regex fails, fall back to simple string comparison
                 return fileName.Equals(pattern, StringComparison.OrdinalIgnoreCase);
             }
+
         }
 
         /// <summary>
@@ -1842,7 +1908,7 @@ namespace Grex.Services
             {
                 try
                 {
-                    var regex = new Regex(excludeDirs, RegexOptions.IgnoreCase);
+                    var regex = new Regex(excludeDirs, RegexOptions.IgnoreCase, RegexMatchTimeout);
                     // Check each directory component in the path
                     var parts = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
                     foreach (var part in parts)
@@ -1972,17 +2038,18 @@ namespace Grex.Services
             {
                 try
                 {
-                    var regexOptions = RegexOptions.Compiled;
+                    var regexOptions = RegexOptions.None;
                     if (!searchCaseSensitive)
                     {
                         regexOptions |= RegexOptions.IgnoreCase;
                     }
-                    compiledRegex = new Regex(searchTerm, regexOptions);
+                    compiledRegex = new Regex(searchTerm, regexOptions, RegexMatchTimeout);
                 }
                 catch (ArgumentException ex)
                 {
                     throw new ArgumentException($"Invalid regex pattern: {ex.Message}");
                 }
+
             }
 
             // Configure enumeration options
@@ -2192,6 +2259,12 @@ namespace Grex.Services
                         
                         var fileInfo = new FileInfo(file);
                         var fileSize = fileInfo.Length;
+                        if (fileSize > MaxReplaceFileSizeBytes)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Skipping replace for oversized file {file} ({fileSize} bytes)");
+                            return;
+                        }
+                        
                         var encodingResult = _encodingDetectionService.DetectFileEncoding(file);
                         var encoding = encodingResult.Encoding;
                         var content = File.ReadAllText(file, encoding);
@@ -2257,6 +2330,10 @@ namespace Grex.Services
                             Encoding = encoding.EncodingName,
                             DateModified = fileInfo.LastWriteTime
                         });
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
                     }
                     catch
                     {
@@ -2471,10 +2548,11 @@ namespace Grex.Services
                 findAndGrep = $"cd '{escapedPath}' && if [ -d .git ]; then git grep -l {grepFlags} '{escapedTerm}' 2>/dev/null | sed 's|^|{escapedPath}/|' || true; else find '{escapedPath}' {findPreds} -exec grep {grepFlags} '{escapedTerm}' {{}} + 2>/dev/null || true; fi";
             }
             
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 try
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var wslArgs = $"{distroArg}bash -c \"{findAndGrep}\"";
                     
                     var processInfo = new ProcessStartInfo
@@ -2490,8 +2568,24 @@ namespace Grex.Services
                     using var process = Process.Start(processInfo);
                     if (process != null)
                     {
-                        var output = process.StandardOutput.ReadToEnd();
-                        process.WaitForExit();
+                        using var _ = cancellationToken.Register(() =>
+                        {
+                            try
+                            {
+                                if (!process.HasExited)
+                                {
+                                    process.Kill(entireProcessTree: true);
+                                }
+                            }
+                            catch
+                            {
+                                // Ignore errors when killing process
+                            }
+                        });
+
+                        var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+                        await process.WaitForExitAsync(cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
                         
                         // Split by both \r\n and \n to handle different line endings
                         var filePaths = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -2501,6 +2595,8 @@ namespace Grex.Services
                         {
                             try
                             {
+                                cancellationToken.ThrowIfCancellationRequested();
+
                                 var trimmedPath = filePath.Trim();
                                 if (string.IsNullOrEmpty(trimmedPath))
                                     continue;
@@ -2529,14 +2625,30 @@ namespace Grex.Services
                                     CreateNoWindow = true
                                 };
                                 
+                                cancellationToken.ThrowIfCancellationRequested();
                                 using var sedProcess = Process.Start(sedProcessInfo);
                                 if (sedProcess != null)
                                 {
-                                    sedProcess.WaitForExit();
+                                    using var sedRegistration = cancellationToken.Register(() =>
+                                    {
+                                        try
+                                        {
+                                            if (!sedProcess.HasExited)
+                                            {
+                                                sedProcess.Kill(entireProcessTree: true);
+                                            }
+                                        }
+                                        catch
+                                        {
+                                            // Ignore errors when killing process
+                                        }
+                                    });
+                                    await sedProcess.WaitForExitAsync(cancellationToken);
                                     
                                     long fileSize = 0;
                                     DateTime dateModified = DateTime.MinValue;
 
+                                    cancellationToken.ThrowIfCancellationRequested();
                                     var statCommand = $"stat -c '%s %Y' '{trimmedPath}'";
                                     var statProcessInfo = new ProcessStartInfo
                                     {
@@ -2551,8 +2663,22 @@ namespace Grex.Services
                                     using var statProcess = Process.Start(statProcessInfo);
                                     if (statProcess != null)
                                     {
-                                        var statOutput = statProcess.StandardOutput.ReadToEnd();
-                                        statProcess.WaitForExit();
+                                        using var statRegistration = cancellationToken.Register(() =>
+                                        {
+                                            try
+                                            {
+                                                if (!statProcess.HasExited)
+                                                {
+                                                    statProcess.Kill(entireProcessTree: true);
+                                                }
+                                            }
+                                            catch
+                                            {
+                                                // Ignore errors when killing process
+                                            }
+                                        });
+                                        var statOutput = await statProcess.StandardOutput.ReadToEndAsync(cancellationToken);
+                                        await statProcess.WaitForExitAsync(cancellationToken);
                                         
                                         var statParts = statOutput.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                                         if (statParts.Length >= 2)
@@ -2583,6 +2709,10 @@ namespace Grex.Services
                                     });
                                 }
                             }
+                            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                            {
+                                throw;
+                            }
                             catch
                             {
                                 // Skip files that can't be processed
@@ -2590,11 +2720,15 @@ namespace Grex.Services
                         }
                     }
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
                 catch
                 {
                     // Handle errors
                 }
-            });
+            }, cancellationToken);
 
             // Apply filename and directory filters (post-processing for WSL)
             if (!string.IsNullOrWhiteSpace(matchFileNames))
@@ -2622,7 +2756,7 @@ namespace Grex.Services
                     {
                         try
                         {
-                            var regex = new Regex(excludeDirs, RegexOptions.IgnoreCase);
+                            var regex = new Regex(excludeDirs, RegexOptions.IgnoreCase, RegexMatchTimeout);
                             foreach (var part in parts)
                             {
                                 if (regex.IsMatch(part))

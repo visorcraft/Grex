@@ -11,8 +11,13 @@ namespace Grex.Services
     /// </summary>
     public class EncodingDetectionService : IEncodingDetectionService
     {
+        // BOM/statistical detection only needs the beginning of a file.
+        // Reading the whole file into memory for every searched file causes GC churn and LOH pressure.
+        private const int MaxEncodingDetectionBytes = 65536;
+
         // Common encodings to check
         private static readonly Encoding[] CommonEncodings = GetSupportedEncodings();
+
 
         private static Encoding[] GetSupportedEncodings()
         {
@@ -104,7 +109,33 @@ namespace Grex.Services
         {
             try
             {
-                var bytes = File.ReadAllBytes(filePath);
+                byte[] bytes;
+                using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 8192, FileOptions.SequentialScan))
+                {
+                    var length = (int)Math.Min(MaxEncodingDetectionBytes, stream.Length);
+                    if (length == 0)
+                    {
+                        return new EncodingDetectionResult(Encoding.UTF8, 0.1, false, "Empty file");
+                    }
+
+                    bytes = new byte[length];
+                    var read = 0;
+                    while (read < length)
+                    {
+                        var chunk = stream.Read(bytes, read, length - read);
+                        if (chunk == 0)
+                        {
+                            break;
+                        }
+                        read += chunk;
+                    }
+
+                    if (read < length)
+                    {
+                        Array.Resize(ref bytes, read);
+                    }
+                }
+
                 return DetectEncoding(bytes, Path.GetFileName(filePath));
             }
             catch (Exception ex)
@@ -112,6 +143,7 @@ namespace Grex.Services
                 return new EncodingDetectionResult(Encoding.UTF8, 0.1, false, $"Error reading file: {ex.Message}");
             }
         }
+
 
         public EncodingDetectionResult DetectEncoding(byte[] bytes)
         {

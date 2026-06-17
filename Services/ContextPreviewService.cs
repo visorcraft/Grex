@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Grex.Models;
 
@@ -26,11 +27,14 @@ namespace Grex.Services
         /// <param name="linesBefore">Number of lines to load before the match (default 5).</param>
         /// <param name="linesAfter">Number of lines to load after the match (default 5).</param>
         /// <returns>A ContextPreviewResult containing the context lines.</returns>
+        private const long MaxContextReadBytes = 1024 * 1024; // 1 MB
+
         public async Task<ContextPreviewResult> GetContextAsync(
             string filePath,
             int lineNumber,
             int linesBefore = 5,
-            int linesAfter = 5)
+            int linesAfter = 5,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrEmpty(filePath))
                 throw new ArgumentException("File path cannot be null or empty.", nameof(filePath));
@@ -59,10 +63,19 @@ namespace Grex.Services
 
                 using var reader = new StreamReader(filePath, encodingResult.Encoding, detectEncodingFromByteOrderMarks: false);
                 int currentLine = 0;
+                long bytesRead = 0;
 
-                while (await reader.ReadLineAsync() is { } line)
+                while (await reader.ReadLineAsync(cancellationToken) is { } line)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     currentLine++;
+                    bytesRead += encodingResult.Encoding.GetByteCount(line) + 1;
+
+                    // Bound how far we read into huge files before the match line.
+                    if (bytesRead > MaxContextReadBytes && currentLine < startLine)
+                    {
+                        break;
+                    }
 
                     // Skip lines before our range
                     if (currentLine < startLine)

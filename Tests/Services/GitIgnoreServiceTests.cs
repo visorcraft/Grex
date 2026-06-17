@@ -1,8 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
 using FluentAssertions;
 using Grex.Services;
 using Xunit;
+
 
 namespace Grex.Tests.Services
 {
@@ -552,6 +557,72 @@ namespace Grex.Tests.Services
             finally
             {
                 // Cleanup
+                TestDataHelper.CleanupTestDirectory(testDirectory);
+            }
+        }
+
+        [Fact]
+        public void ShouldIgnoreFile_CacheIsBounded_WhenManyRootsAreSearched()
+        {
+            // Arrange
+            const int rootCount = 150;
+            var rootDirectories = new List<string>();
+
+            for (int i = 0; i < rootCount; i++)
+            {
+                var rootDirectory = TestDataHelper.CreateTestDirectory();
+                rootDirectories.Add(rootDirectory);
+                File.WriteAllText(Path.Combine(rootDirectory, ".gitignore"), "*.log");
+                TestDataHelper.CreateTestFile(rootDirectory, "test.txt", "content");
+            }
+
+            try
+            {
+                // Act
+                foreach (var rootDirectory in rootDirectories)
+                {
+                    var testFile = Path.Combine(rootDirectory, "test.txt");
+                    _gitIgnoreService.ShouldIgnoreFile(testFile, rootDirectory);
+                }
+
+                var cacheField = typeof(GitIgnoreService).GetField("_gitignoreCache", BindingFlags.NonPublic | BindingFlags.Instance);
+                var cache = cacheField?.GetValue(_gitIgnoreService) as Dictionary<string, List<GitIgnoreRule>>;
+
+                // Assert
+                cache.Should().NotBeNull();
+                cache!.Count.Should().BeLessOrEqualTo(100);
+            }
+            finally
+            {
+                foreach (var rootDirectory in rootDirectories)
+                {
+                    TestDataHelper.CleanupTestDirectory(rootDirectory);
+                }
+            }
+        }
+
+        [Fact]
+        public void ShouldIgnoreFile_CanBeCalledFromMultipleThreadsConcurrently()
+        {
+            // Arrange
+            var testDirectory = TestDataHelper.CreateTestDirectory();
+            var gitIgnoreFile = Path.Combine(testDirectory, ".gitignore");
+            File.WriteAllText(gitIgnoreFile, "*.log\nbuild/");
+            var testFile = TestDataHelper.CreateTestFile(testDirectory, "test.txt", "content");
+
+            try
+            {
+                // Act
+                Parallel.For(0, 100, _ =>
+                {
+                    _gitIgnoreService.ShouldIgnoreFile(testFile, testDirectory);
+                });
+
+                // Assert - no exception means the cache is thread-safe
+                _gitIgnoreService.ShouldIgnoreFile(testFile, testDirectory).Should().BeFalse();
+            }
+            finally
+            {
                 TestDataHelper.CleanupTestDirectory(testDirectory);
             }
         }
