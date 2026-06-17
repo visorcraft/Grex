@@ -5,7 +5,11 @@ using FluentAssertions;
 using Grex.Models;
 using Xunit;
 
-namespace Grex.Tests.Models
+// NOTE: namespace is Grex.Tests (not Grex.Tests.Models) on purpose. A
+// Grex.Tests.Models namespace would shadow the Grex.Models namespace for
+// every Grex.Tests.* file that uses the "Models.Foo" idiom (e.g.
+// SearchServiceTests, TabViewModelTests), breaking their compilation.
+namespace Grex.Tests
 {
     public class RangeObservableCollectionTests
     {

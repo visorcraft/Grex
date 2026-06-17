@@ -586,7 +586,9 @@ namespace Grex.Tests.Services
                 }
 
                 var cacheField = typeof(GitIgnoreService).GetField("_gitignoreCache", BindingFlags.NonPublic | BindingFlags.Instance);
-                var cache = cacheField?.GetValue(_gitIgnoreService) as Dictionary<string, List<GitIgnoreRule>>;
+                // GitIgnoreRule is a private nested type of GitIgnoreService, so it cannot be
+                // named here; cast to the non-generic IDictionary just to assert the entry count.
+                var cache = cacheField?.GetValue(_gitIgnoreService) as System.Collections.IDictionary;
 
                 // Assert
                 cache.Should().NotBeNull();
