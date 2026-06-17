@@ -492,6 +492,15 @@ namespace Grex.Services
                         {
                             matches = compiledRegex.IsMatch(line);
                         }
+                        catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+                        {
+                            // The pattern exceeded RegexMatchTimeout on this line. Without this
+                            // branch the failure would be absorbed by the bare catch below and the
+                            // match silently dropped; log it so a slow/catastrophic pattern leaves
+                            // a diagnostic trail instead of vanishing.
+                            LogService.Write($"Regex match timed out (skipping line) in '{filePath}'");
+                            continue;
+                        }
                         catch
                         {
                             // Skip lines that cause regex errors (e.g., invalid encoding)
