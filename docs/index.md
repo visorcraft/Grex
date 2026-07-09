@@ -5,7 +5,7 @@ layout: default
 
 ## Welcome
 
-Welcome to the official Grex docs site—the single place to learn what the app can do, how to use it, and how to extend or build it yourself.
+Welcome to the official Grex docs site-the single place to learn what the app can do, how to use it, and how to extend or build it yourself.
 
 ## Overview
 

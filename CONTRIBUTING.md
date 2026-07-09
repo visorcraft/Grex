@@ -43,24 +43,24 @@ screenshots when the change affects the GUI.
 
 ## Project layout
 
-- `Grex.csproj` — the WinUI 3 desktop app (root project).
-- `Grex.Cli/` — the `grex-cli.exe` command-line companion.
-- `Models/` — POCO data types used by both the UI and the engine.
-- `Services/` — search, replace, settings, history, container, WSL,
+- `Grex.csproj` - the WinUI 3 desktop app (root project).
+- `Grex.Cli/` - the `grex-cli.exe` command-line companion.
+- `Models/` - POCO data types used by both the UI and the engine.
+- `Services/` - search, replace, settings, history, container, WSL,
   encoding, document-extraction, localization, and journaling logic.
-- `ViewModels/` — observable VMs bound to XAML. No engine logic.
-- `Controls/` — reusable XAML controls.
-- `Converters/` — `IValueConverter` implementations for XAML bindings.
-- `Strings/` — Windows resource files (`.resw`) for 100+ locales.
-- `Tests/` — unit tests (`Grex.Tests`, `Grex.Cli.Tests`).
-- `IntegrationTests/` — integration tests that touch the real
+- `ViewModels/` - observable VMs bound to XAML. No engine logic.
+- `Controls/` - reusable XAML controls.
+- `Converters/` - `IValueConverter` implementations for XAML bindings.
+- `Strings/` - Windows resource files (`.resw`) for 100+ locales.
+- `Tests/` - unit tests (`Grex.Tests`, `Grex.Cli.Tests`).
+- `IntegrationTests/` - integration tests that touch the real
   filesystem, Docker, or WSL.
-- `UITests/` — ViewModel-driven UI tests.
-- `Scripts/` — Python helpers for localization and version bumping.
-- `docs/` — feature reference, architecture, usage guide, and audits.
+- `UITests/` - ViewModel-driven UI tests.
+- `Scripts/` - Python helpers for localization and version bumping.
+- `docs/` - feature reference, architecture, usage guide, and audits.
 
 Keep algorithmic behavior in `Services/`. ViewModels should orchestrate
-service calls and surface state for binding — they should not
+service calls and surface state for binding - they should not
 re-implement search, replace, or filtering logic.
 
 ## Local development
@@ -90,14 +90,14 @@ The WinApp SDK requires a concrete `-p:Platform` (x86 / x64 / ARM64).
   `Services/`, observable state in `ViewModels/`, and bind from XAML.
 - Use `async`/`await` end-to-end for I/O-bound work. Do not block the
   UI thread.
-- Route all user-facing strings through the localization service —
+- Route all user-facing strings through the localization service -
   never hard-code English in XAML or C#. New keys must be added to the
   English `Strings/en-US/Resources.resw` and to every other locale
   catalog with a placeholder if the translation is not ready.
 - Prefer explicit, focused code over speculative abstraction.
 - Add comments only when the reason is not obvious from the code.
 - Do not hand-edit `.csproj` files for refactors that the IDE can do.
-- Do not add a code-behind override that mutates a ViewModel — go
+- Do not add a code-behind override that mutates a ViewModel - go
   through bindings or expose a command.
 - Do not require nightly tooling. CI runs the public .NET 8 SDK.
 
@@ -118,7 +118,7 @@ Use the comment syntax appropriate for the file type (`//` for C# and
 - New `IValueConverter` types belong in `Converters/`.
 - Theme-aware brushes should follow the existing pattern (Mica
   backdrop, light/dark variants).
-- Touch UI changes need a screenshot in the PR — both light and dark
+- Touch UI changes need a screenshot in the PR - both light and dark
   themes when applicable.
 
 ## Tests
@@ -178,7 +178,7 @@ Update documentation in the same pull request when behavior changes.
 ## Releasing
 
 The product version is declared in several files. Do **not** edit them by
-hand — run the helper, which keeps every location in sync:
+hand - run the helper, which keeps every location in sync:
 
 ```powershell
 python Scripts\update_version.py 1.2.0
@@ -187,14 +187,14 @@ python Scripts\update_version.py 1.2.0
 Grex uses 3-part SemVer (`X.Y.Z`). A 2-part value (`1.2`) is accepted and
 normalized to `1.2.0`. The script updates every version location:
 
-- `Directory.Build.props` — `<Version>X.Y.Z</Version>` (solution-wide; drives
+- `Directory.Build.props` - `<Version>X.Y.Z</Version>` (solution-wide; drives
   the CLI's informational version).
-- `Properties/AssemblyInfo.cs` — `AssemblyVersion` / `AssemblyFileVersion`
+- `Properties/AssemblyInfo.cs` - `AssemblyVersion` / `AssemblyFileVersion`
   (4-part `X.Y.Z.0`) and `AssemblyInformationalVersion` (`X.Y.Z`).
-- `Package.appxmanifest` — `Version="X.Y.Z.0"` (the MSIX schema requires four
+- `Package.appxmanifest` - `Version="X.Y.Z.0"` (the MSIX schema requires four
   parts, so it cannot be 3-part).
-- `app.manifest` — `<assemblyIdentity version="X.Y.Z.0" />`.
-- `Controls/AboutView.xaml.cs` — the hard-coded fallback shown in the About
+- `app.manifest` - `<assemblyIdentity version="X.Y.Z.0" />`.
+- `Controls/AboutView.xaml.cs` - the hard-coded fallback shown in the About
   dialog (the live value is read from the assembly at runtime).
 
 After bumping, commit and tag the release commit (tags are signed):

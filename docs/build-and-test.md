@@ -14,13 +14,13 @@ Use this reference when you need to set up Grex locally, run the full test matri
 - **Windows App SDK 1.8** (restored via NuGet)
 - **Windows App Runtime 1.8 (x64)** for toast notifications and diagnostics  
   `winget install --id Microsoft.WindowsAppRuntime.1.8 -e --source winget`
-- **Visual Studio 2022** (recommended) with the “.NET desktop development” workload  
+- **Visual Studio 2022** (recommended) with the ".NET desktop development" workload  
   or VS Code + C# Dev Kit
 - **WSL** installed if you plan to search Linux filesystems
 
 ## Building the Solution
 
-> The WinApp SDK tooling requires a concrete platform (x86, x64, ARM64). “Any CPU” builds will fail.
+> The WinApp SDK tooling requires a concrete platform (x86, x64, ARM64). "Any CPU" builds will fail.
 
 ```powershell
 # Restore
@@ -116,9 +116,9 @@ A few localization tests are intentionally skipped because WinUI resource loader
 
 ## Runtime Requirements & Diagnostics
 
-- **Windows notifications** – Require Windows App Runtime. Use **Settings → Debug → Test Notification** to confirm the environment or get remediation steps/log locations.
-- **Administrator warning** – Grex detects elevated launches and warns because toasts don’t fire in admin sessions.
-- **WSL searches** – Ensure the `wsl` command works from PowerShell and that your distro is running; Grex shells out to `grep` where appropriate.
+- **Windows notifications** - Require Windows App Runtime. Use **Settings → Debug → Test Notification** to confirm the environment or get remediation steps/log locations.
+- **Administrator warning** - Grex detects elevated launches and warns because toasts don't fire in admin sessions.
+- **WSL searches** - Ensure the `wsl` command works from PowerShell and that your distro is running; Grex shells out to `grep` where appropriate.
 
 ## Icon & Asset Generation
 
@@ -144,9 +144,9 @@ Alternatively, run the `IconGenerator` utility under `IconGenerator/` (`dotnet b
 
 ## File Locations & Logs
 
-- **Settings** – `%LocalAppData%\Grex\settings.json`
-- **Recent paths** – `%LocalAppData%\Grex\search_path_history.json`
-- **Diagnostics logs** – `%Temp%\Grex.log` plus `%LocalAppData%\Grex\notification_test.log` when running the notification tester.
+- **Settings** - `%LocalAppData%\Grex\settings.json`
+- **Recent paths** - `%LocalAppData%\Grex\search_path_history.json`
+- **Diagnostics logs** - `%Temp%\Grex.log` plus `%LocalAppData%\Grex\notification_test.log` when running the notification tester.
 
 Refer back to this document whenever you need the authoritative commands and requirements. For feature walk-throughs see `docs/features.md`, for daily workflows see `docs/usage.md`, and for architectural breakdowns see `docs/architecture.md`.
 

@@ -134,7 +134,7 @@ Settings → AI Search includes a **Test Endpoint** button that validates connec
 
 ## Search Profiles File Structure
 
-Grex stores saved search profiles in `%LocalAppData%\Grex\search_profiles.json` as a JSON array. Each entry is a snapshot of the tab’s search settings at the time the profile was saved.
+Grex stores saved search profiles in `%LocalAppData%\Grex\search_profiles.json` as a JSON array. Each entry is a snapshot of the tab's search settings at the time the profile was saved.
 
 Example:
 
@@ -175,9 +175,9 @@ When filtering files by size, Grex applies tolerance ranges to handle rounding:
 
 | Unit | Tolerance | Example |
 |------|-----------|---------|
-| KB | ±10 KB | "Equal To 100 KB" matches 90–110 KB |
-| MB | ±1 MB | "Equal To 10 MB" matches 9–11 MB |
-| GB | ±25 MB | "Equal To 1 GB" matches ~975 MB–1025 MB |
+| KB | ±10 KB | "Equal To 100 KB" matches 90-110 KB |
+| MB | ±1 MB | "Equal To 10 MB" matches 9-11 MB |
+| GB | ±25 MB | "Equal To 1 GB" matches ~975 MB-1025 MB |
 
 Tolerances apply to all operations: "Less Than" allows files up to (limit + tolerance), "Greater Than" allows files down to (limit - tolerance).
 
@@ -324,8 +324,8 @@ The status bar formats elapsed time intelligently:
 | Duration | Format Example |
 |----------|----------------|
 | < 30 seconds | "12.43 seconds" (with milliseconds) |
-| 30–59 seconds | "45 seconds" (whole seconds) |
-| 1–59 minutes | "2 minutes 15 seconds" |
+| 30-59 seconds | "45 seconds" (whole seconds) |
+| 1-59 minutes | "2 minutes 15 seconds" |
 | 60+ minutes | "1 hour 9 minutes" |
 
 Singular/plural forms are used correctly ("1 minute" vs "2 minutes").
@@ -384,12 +384,12 @@ grex-cli <path> <term> [options]
 
 ### CLI Output Formats
 
-**Text (default)** – grep-compatible format:
+**Text (default)** - grep-compatible format:
 ```
 path/to/file.cs:42:10:// TODO: Fix this
 ```
 
-**JSON** – Pretty-printed array:
+**JSON** - Pretty-printed array:
 ```json
 [
   {
@@ -403,7 +403,7 @@ path/to/file.cs:42:10:// TODO: Fix this
 ]
 ```
 
-**CSV** – Header row plus data:
+**CSV** - Header row plus data:
 ```
 File,Line,Column,Content,FullPath,MatchCount
 path/to/file.cs,42,10,// TODO: Fix this,C:\Projects\path\to\file.cs,1

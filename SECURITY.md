@@ -64,11 +64,11 @@ A future "diagnostics" feature, if added, must:
 
 Grex makes network requests in exactly two situations:
 
-1. **AI Search Chat** — only when the AI feature is enabled AND the
+1. **AI Search Chat** - only when the AI feature is enabled AND the
    user has supplied an endpoint + API key AND they explicitly invoke
    the AI panel. The allowed endpoint set is OpenAI-compatible
    servers configured by the user.
-2. **Endpoint test** (`Settings → AI → Test endpoint`) — a single
+2. **Endpoint test** (`Settings → AI → Test endpoint`) - a single
    request against the user-supplied endpoint to verify connectivity.
 
 No other Grex subsystem opens a socket. Update checks, telemetry, and
@@ -84,7 +84,7 @@ crash uploads do not exist.
   `%LOCALAPPDATA%\Grex\replace-journal.json` records each file the
   replace pipeline modifies; the journal is rotated on clean exit.
 - **UNC shares** are accessed using the credentials of the running
-  user — Grex does not prompt for, store, or transmit network
+  user - Grex does not prompt for, store, or transmit network
   credentials.
 - **WSL search** invokes `wsl.exe` against the user-selected
   distribution and runs `grep`-equivalents inside it. Grex does not
@@ -147,7 +147,7 @@ API keys are excluded from:
 
 The CLI logs to `%LOCALAPPDATA%\Grex\logs\grex.log` by default. The
 default fields are search root, query, regex flag, case sensitivity,
-and gitignore flag — none of which would be considered a secret by
+and gitignore flag - none of which would be considered a secret by
 themselves.
 
 A future privacy-mode toggle will redact:

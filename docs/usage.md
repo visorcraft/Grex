@@ -5,7 +5,7 @@ layout: default
 
 # Usage Guide
 
-This guide walks through the complete workflow for running searches, managing tabs, and taking advantage of Grex’s advanced capabilities.
+This guide walks through the complete workflow for running searches, managing tabs, and taking advantage of Grex's advanced capabilities.
 
 ## 1. Pick Your Search Location
 
@@ -59,8 +59,8 @@ Before diving into a file, you can quickly preview the surrounding lines of any 
    - Context lines before and after the match (default 5, configurable in Settings → Context Preview)
    - The matched line highlighted with a blue indicator bar
    - Line numbers in a gutter for easy reference
-4. **Open in Editor** – Click this button to jump directly to the file at the matched line in your default editor.
-5. **Close** – Press Escape or click Close to dismiss the preview and continue searching.
+4. **Open in Editor** - Click this button to jump directly to the file at the matched line in your default editor.
+5. **Close** - Press Escape or click Close to dismiss the preview and continue searching.
 
 **Tip**: Context Preview is especially useful when you have many matches and want to quickly assess each one without opening every file. Adjust the context line count (1-20) in Settings to show more or less surrounding code.
 
@@ -70,7 +70,7 @@ After a search completes, use the **Search within results…** box above the tab
 
 - **Content mode** filters by file name, relative path, and matched line text.
 - **Files mode** filters by file name, relative path, extension, and encoding.
-- **Regex mode** – Click the `.*` toggle button to use regular expressions for filtering.
+- **Regex mode** - Click the `.*` toggle button to use regular expressions for filtering.
 - Clearing the box restores the unfiltered results and the normal "Found …" status summary.
 
 ## 5c. Use AI Search Chat
@@ -104,7 +104,7 @@ When you want semantic help instead of strict literal/Regex matching:
 - While a search is running, the **Search** button changes to **Stop** with a stop icon.
 - While a replace is running, the **Replace** button changes to **Stop** with a stop icon.
 - Click **Stop** at any time to immediately cancel the operation.
-- Cancellation is graceful—no errors or partial state corruption.
+- Cancellation is graceful-no errors or partial state corruption.
 - During a search, the Replace button is disabled; during a replace, the Search button is disabled to prevent conflicting operations.
 
 ## 7. Export Results
@@ -113,10 +113,10 @@ After running a search, export your results for further analysis or sharing:
 
 1. **Click the Export button** in the command bar (enabled when results exist).
 2. **Choose a format:**
-   - **CSV** – Opens a file picker to save as comma-separated values, suitable for spreadsheets.
-   - **JSON** – Opens a file picker to save as pretty-printed JSON, ideal for programmatic processing.
-   - **Copy to Clipboard** – Copies tab-separated values directly to your clipboard for quick pasting.
-3. **Save location** – The file picker suggests a timestamped filename (e.g., `grex_results_2024_01_15_14_30.csv`).
+   - **CSV** - Opens a file picker to save as comma-separated values, suitable for spreadsheets.
+   - **JSON** - Opens a file picker to save as pretty-printed JSON, ideal for programmatic processing.
+   - **Copy to Clipboard** - Copies tab-separated values directly to your clipboard for quick pasting.
+3. **Save location** - The file picker suggests a timestamped filename (e.g., `grex_results_2024_01_15_14_30.csv`).
 
 **Tip**: Content mode exports include line numbers and content; Files mode exports include size, encoding, and timestamps.
 
@@ -126,8 +126,8 @@ Grex automatically tracks your recent searches for quick recall:
 
 1. **Click the search history dropdown** next to the search box.
 2. **Select a recent search** to restore the query, path, and all filter settings instantly.
-3. **Remove entries** – Hover over an entry and click the remove button to delete it.
-4. **Clear all** – Use the "Clear History" option to remove all entries.
+3. **Remove entries** - Hover over an entry and click the remove button to delete it.
+4. **Clear all** - Use the "Clear History" option to remove all entries.
 
 **Note**: Up to 20 searches are stored in `%LocalAppData%\Grex\search_history.json`.
 
@@ -167,9 +167,9 @@ Profiles are stored in `%LocalAppData%\Grex\search_profiles.json`.
 
 The **Backup & Restore** section in Settings lets you preserve or transfer your configuration:
 
-1. **Export Settings** – Click to save a timestamped copy of your settings (e.g., `settings_2024_01_15_14_30_45.json`). Use a file picker to choose where to save it.
-2. **Import Settings** – Click to browse for a previously exported JSON file. Grex validates the file and merges the settings into your current configuration. Some changes (like theme or language) may require a restart to take full effect.
-3. **Restore Defaults** – Click to delete your settings.json and restart the application with factory defaults. A confirmation dialog ensures you don't accidentally reset.
+1. **Export Settings** - Click to save a timestamped copy of your settings (e.g., `settings_2024_01_15_14_30_45.json`). Use a file picker to choose where to save it.
+2. **Import Settings** - Click to browse for a previously exported JSON file. Grex validates the file and merges the settings into your current configuration. Some changes (like theme or language) may require a restart to take full effect.
+3. **Restore Defaults** - Click to delete your settings.json and restart the application with factory defaults. A confirmation dialog ensures you don't accidentally reset.
 
 **Note**: Window position and size are excluded from imports since they are machine-specific.
 
@@ -184,32 +184,32 @@ The **Backup & Restore** section in Settings lets you preserve or transfer your 
 ## Windows Search Integration Tips
 
 - Enable the toggle when searching Windows folders that are indexed (Documents, Desktop, etc.).
-- Grex queries the index for candidate files, then still applies every filter and reads the files to confirm matches—so results remain accurate.
+- Grex queries the index for candidate files, then still applies every filter and reads the files to confirm matches-so results remain accurate.
 - Regex searches, WSL paths, and non-indexed locations automatically fall back to the custom file walker; no manual toggling required.
 
 ## Docker Container Search
 
-1. **Enable Docker Search** – Open **Settings → Docker Search** and toggle "Enable Docker Search" once per machine. This preference is saved and applied to all new tabs.
-2. **Select a Container** – After enabling Docker search, each tab shows a "Search Target" dropdown beside the path field. The dropdown defaults to "Local Disk" for normal file system searches.
-3. **Choose a Running Container** – Select any running Docker container from the dropdown to search inside that container. The dropdown lists all currently running containers with their names and IDs.
-4. **Refresh Container List** – Click the refresh button (↻) next to the dropdown to update the list of running containers without restarting the application.
-5. **Enter Container Path** – When a container is selected, enter the path you want to search inside the container (e.g., `/var/www/html`, `/app/src`, `/usr/local/bin`). Grex automatically uses the most efficient search method available.
-6. **Search Methods** – Grex uses two search strategies for Docker containers, automatically selecting the best one:
+1. **Enable Docker Search** - Open **Settings → Docker Search** and toggle "Enable Docker Search" once per machine. This preference is saved and applied to all new tabs.
+2. **Select a Container** - After enabling Docker search, each tab shows a "Search Target" dropdown beside the path field. The dropdown defaults to "Local Disk" for normal file system searches.
+3. **Choose a Running Container** - Select any running Docker container from the dropdown to search inside that container. The dropdown lists all currently running containers with their names and IDs.
+4. **Refresh Container List** - Click the refresh button (↻) next to the dropdown to update the list of running containers without restarting the application.
+5. **Enter Container Path** - When a container is selected, enter the path you want to search inside the container (e.g., `/var/www/html`, `/app/src`, `/usr/local/bin`). Grex automatically uses the most efficient search method available.
+6. **Search Methods** - Grex uses two search strategies for Docker containers, automatically selecting the best one:
    - **Direct Grep (Preferred)**: Uses the Docker API to run `grep` directly inside the container. This is significantly faster because it doesn't require copying files to the host. Grex automatically checks if `grep` is available in the container.
    - **Mirror Fallback**: If `grep` is not available in the container (e.g., minimal Alpine images without coreutils), Grex falls back to mirroring the container path to a temporary local directory (`%LocalAppData%\Grex\docker-mirrors`) and searching the mirrored files.
-7. **Search Behavior** – When searching a container:
+7. **Search Behavior** - When searching a container:
    - Grex first attempts the direct grep method via the Docker API
    - If grep is unavailable, it automatically falls back to the mirror approach
    - Result paths are displayed as container paths regardless of which method was used
    - The Browse button is automatically disabled to prevent mixing host and container paths
    - Replace operations are disabled (container files are read-only from the host)
    - Windows Search integration is automatically disabled (containers are not indexed by Windows)
-8. **Symbolic Links** – When the "Include symbolic links" option is unchecked (the default), Grex uses `tar --dereference` to copy actual file contents instead of creating symlinks. This avoids Windows privilege issues with directories like `node_modules` that contain many symlinks.
-9. **Context Menu** – Right-clicking results in Docker mode shows container-specific options:
-   - **Copy Container Path** – Copies the container path (e.g., `/var/www/html/file.txt`) to the clipboard
-   - **Copy File Name** – Copies just the filename to the clipboard
+8. **Symbolic Links** - When the "Include symbolic links" option is unchecked (the default), Grex uses `tar --dereference` to copy actual file contents instead of creating symlinks. This avoids Windows privilege issues with directories like `node_modules` that contain many symlinks.
+9. **Context Menu** - Right-clicking results in Docker mode shows container-specific options:
+   - **Copy Container Path** - Copies the container path (e.g., `/var/www/html/file.txt`) to the clipboard
+   - **Copy File Name** - Copies just the filename to the clipboard
    - These shortcuts make it easy to jump back into `docker exec` or your IDE with the correct container path
-10. **Automatic Cleanup** – Mirrored container paths are automatically cleaned up after searches complete. Old mirrors (older than 6 hours) are pruned automatically.
+10. **Automatic Cleanup** - Mirrored container paths are automatically cleaned up after searches complete. Old mirrors (older than 6 hours) are pruned automatically.
 
 **Note**: Docker search requires Docker Desktop to be installed and running. The container dropdown will be disabled if Docker is not available. For the fastest searches, use containers that include `grep` (most Linux-based images do).
 

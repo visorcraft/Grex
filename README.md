@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>The modern, customizable and tabbed Windows grep experience.</strong><br>
-  Search native drives, UNC shares, Docker containers, and entire WSL distributions with instant previews, Regex visualizations, and safe bulk replace—all powered by WinUI 3 and .NET 8.
+  Search native drives, UNC shares, Docker containers, and entire WSL distributions with instant previews, Regex visualizations, and safe bulk replace-all powered by WinUI 3 and .NET 8.
 </p>
 
 <p align="center">
@@ -31,20 +31,20 @@
 
 ## ✨ Highlights
 
-- **Lightning-fast scanning** – Streamed IO, smart caching, and optional Windows Search acceleration keep huge repos responsive
-- **Windows + WSL, one workflow** – Switch between `C:\`, `\\server`, and `\\wsl$\Ubuntu` without touching a terminal
-- **Docker container search** – Search directly inside running containers using the Docker API or local mirroring
-- **AI-assisted search chat** – Start an AI discussion from the Search tab using your path, query, and active filters as context
-- **Visual Regex Builder** – Design patterns with presets and live breakdowns before unleashing them on your codebase
-- **Safe replace** – Confirmation dialogs, per-file summaries, and culture-aware matching make global edits reliable
-- **Context preview** – Peek at the surrounding lines for a match without opening the file (like `grep -C`)
-- **Search within results** – Instantly filter the current results list without re-scanning the filesystem
-- **Search profiles** – Save and recall named searches (path + filters) from the command bar
-- **Export results** – Copy to clipboard or export to CSV/JSON for reporting and automation
-- **Search history** – Re-run or tweak recent searches without re-entering paths and filters
-- **CLI mode** – Headless command-line interface (`grex-cli`) for script integration with grep-compatible output
-- **Multilingual UI** – 100 languages supported with instant interface updates
-- **Modern Windows design** – Tabs, command bar, column controls, and a Mica-coated shell feel native on Windows 11
+- **Lightning-fast scanning** - Streamed IO, smart caching, and optional Windows Search acceleration keep huge repos responsive
+- **Windows + WSL, one workflow** - Switch between `C:\`, `\\server`, and `\\wsl$\Ubuntu` without touching a terminal
+- **Docker container search** - Search directly inside running containers using the Docker API or local mirroring
+- **AI-assisted search chat** - Start an AI discussion from the Search tab using your path, query, and active filters as context
+- **Visual Regex Builder** - Design patterns with presets and live breakdowns before unleashing them on your codebase
+- **Safe replace** - Confirmation dialogs, per-file summaries, and culture-aware matching make global edits reliable
+- **Context preview** - Peek at the surrounding lines for a match without opening the file (like `grep -C`)
+- **Search within results** - Instantly filter the current results list without re-scanning the filesystem
+- **Search profiles** - Save and recall named searches (path + filters) from the command bar
+- **Export results** - Copy to clipboard or export to CSV/JSON for reporting and automation
+- **Search history** - Re-run or tweak recent searches without re-entering paths and filters
+- **CLI mode** - Headless command-line interface (`grex-cli`) for script integration with grep-compatible output
+- **Multilingual UI** - 100 languages supported with instant interface updates
+- **Modern Windows design** - Tabs, command bar, column controls, and a Mica-coated shell feel native on Windows 11
 
 ## Quick Start
 
@@ -70,13 +70,13 @@ dotnet build grex.sln -p:Platform=x64
 
 ## 🚀 Usage in 60 Seconds
 
-1. **Pick a path** – Browse or paste `C:\repo`, `\\server\logs`, or `\\wsl$\Ubuntu\home\user`
-2. **Choose search mode** – Plain text or Regex; Content (per-line) or Files (per-file) results
-3. **Refine filters** – Toggle `.gitignore`, hidden/system/bin/link flags, filename patterns, size limits, and Windows Search seeding
-4. **Run / replace** – Press Enter to search, fill "Replace with" for bulk edits, and confirm the safety dialog
-5. **Inspect results** – Sort, resize, hide columns, filter within results, or double-click to open files. Tabs keep parallel searches isolated
-6. **Target Docker containers** – Enable in Settings, select a container from the dropdown, and search container paths directly
-7. **Use AI search chat (optional)** – Configure endpoint/API key/model in Settings, click the **AI** button, and refine results in a chat view
+1. **Pick a path** - Browse or paste `C:\repo`, `\\server\logs`, or `\\wsl$\Ubuntu\home\user`
+2. **Choose search mode** - Plain text or Regex; Content (per-line) or Files (per-file) results
+3. **Refine filters** - Toggle `.gitignore`, hidden/system/bin/link flags, filename patterns, size limits, and Windows Search seeding
+4. **Run / replace** - Press Enter to search, fill "Replace with" for bulk edits, and confirm the safety dialog
+5. **Inspect results** - Sort, resize, hide columns, filter within results, or double-click to open files. Tabs keep parallel searches isolated
+6. **Target Docker containers** - Enable in Settings, select a container from the dropdown, and search container paths directly
+7. **Use AI search chat (optional)** - Configure endpoint/API key/model in Settings, click the **AI** button, and refine results in a chat view
 
 Need the full walkthrough? See the **[Usage Guide](docs/usage.md)**.
 
