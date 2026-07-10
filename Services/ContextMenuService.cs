@@ -537,7 +537,7 @@ namespace Grex.Services
             {
                 // Run `wsl wslpath -w` to get Windows path with correct distro
                 // wslpath is a Linux command, so it must be run through wsl.exe
-                var process = new Process
+                using var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {

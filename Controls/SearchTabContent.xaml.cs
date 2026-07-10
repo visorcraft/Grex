@@ -2056,6 +2056,8 @@ namespace Grex.Controls
             if (_isAiRequestInFlight)
             {
                 _aiRequestCancellationTokenSource?.Cancel();
+                _aiRequestCancellationTokenSource?.Dispose();
+                _aiRequestCancellationTokenSource = null;
                 return;
             }
 
@@ -2307,6 +2309,8 @@ namespace Grex.Controls
                 return;
 
             _aiRequestCancellationTokenSource?.Cancel();
+            _aiRequestCancellationTokenSource?.Dispose();
+            _aiRequestCancellationTokenSource = null;
             _isAiRequestInFlight = false;
             SetAiMode(false);
 
@@ -2694,6 +2698,8 @@ namespace Grex.Controls
                 return;
 
             _aiRequestCancellationTokenSource?.Cancel();
+            _aiRequestCancellationTokenSource?.Dispose();
+            _aiRequestCancellationTokenSource = null;
             _isAiRequestInFlight = false;
             ClearAiConversation();
             SetAiMode(false);
@@ -2837,6 +2843,8 @@ namespace Grex.Controls
                 return;
 
             _aiRequestCancellationTokenSource?.Cancel();
+            _aiRequestCancellationTokenSource?.Dispose();
+            _aiRequestCancellationTokenSource = null;
             _isAiRequestInFlight = false;
             SetAiMode(false);
 

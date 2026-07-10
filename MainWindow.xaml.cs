@@ -403,6 +403,15 @@ namespace Grex
                     _appWindow.Changed -= AppWindow_Changed;
                 }
                 this.Closed -= MainWindow_Closed;
+
+                // Cancel and dispose any pending debounced localization refresh
+                // so its awaiting Task can't outlive the window.
+                lock (_refreshLocalizationLock)
+                {
+                    _refreshLocalizationCancellation?.Cancel();
+                    _refreshLocalizationCancellation?.Dispose();
+                    _refreshLocalizationCancellation = null;
+                }
             }
         }
 

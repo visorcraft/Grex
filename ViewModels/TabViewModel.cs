@@ -1608,6 +1608,12 @@ namespace Grex.ViewModels
             CancelSearch();
             _searchCancellationTokenSource?.Dispose();
             _searchCancellationTokenSource = null;
+            // Drop any retained result state so a tab with millions of matches
+            // can be reclaimed as soon as the user closes it.
+            _allSearchResults.Clear();
+            _allFileSearchResults.Clear();
+            SearchResults.Clear();
+            FileSearchResults.Clear();
             ScheduleMirrorCleanup();
         }
 
