@@ -535,6 +535,38 @@ namespace Grex.Tests.Services
         }
 
         [Fact]
+        public async Task ReplaceAsync_WithBinarySearchEnabled_DoesNotRewriteDocuments()
+        {
+            var testDirectory = TestDataHelper.CreateTestDirectory();
+            var testFile = TestDataHelper.CreateTestFile(testDirectory, "report.pdf", "Hello World");
+
+            try
+            {
+                var results = await _searchService.ReplaceAsync(
+                    testDirectory, "World", "Universe", false, false, false, true, true,
+                    false, true, false, Models.SizeLimitType.NoLimit, null, Models.SizeUnit.KB,
+                    "", "", Models.StringComparisonMode.Ordinal,
+                    Models.UnicodeNormalizationMode.None, true, null);
+
+                results.Should().BeEmpty();
+                File.ReadAllText(testFile).Should().Be("Hello World");
+            }
+            finally
+            {
+                TestDataHelper.CleanupTestDirectory(testDirectory);
+            }
+        }
+
+        [Fact]
+        public void BuildSedExpression_EscapesLiteralPatternAndReplacement()
+        {
+            var expression = SearchService.BuildSedExpression(
+                "a.b/c", @"x&y\z", isRegex: false, caseSensitive: false);
+
+            expression.Should().Be(@"s|a\.b/c|x\&y\\z|gi");
+        }
+
+        [Fact]
         public async Task SearchAsync_WithMatchFileNames_Wildcard_ReturnsOnlyMatchingFiles()
         {
             // Arrange

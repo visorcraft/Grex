@@ -1,27 +1,31 @@
-- title: Getting Started
-  nav:
+- title: Start
+  url: /Grex/
+
+- title: Use Grex
+  children:
     - title: Usage Guide
-      url: /docs/usage.html
-
-- title: Guides
-  nav:
-    - title: Feature Deep Dive
-      url: /docs/features.html
-
-- title: Architecture
-  nav:
-    - title: Architecture Overview
-      url: /docs/architecture.html
-
-- title: Build & Test
-  nav:
-    - title: Build & Test Reference
-      url: /docs/build-and-test.html
-
-- title: Reference
-  nav:
+      url: /Grex/usage.html
+    - title: Feature Matrix
+      url: /Grex/features.html
     - title: Technical Reference
-      url: /docs/reference.html
-    - title: Translations
-      url: /docs/translations.html
+      url: /Grex/reference.html
 
+- title: Develop
+  children:
+    - title: Architecture
+      url: /Grex/architecture.html
+    - title: Build and Test
+      url: /Grex/build-and-test.html
+    - title: Translation
+      url: /Grex/translations.html
+    - title: Regex Localization
+      url: /Grex/regex-localization.html
+
+- title: Project
+  children:
+    - title: Repository
+      url: https://github.com/visorcraft/Grex
+    - title: Contributing
+      url: https://github.com/visorcraft/Grex/blob/master/CONTRIBUTING.md
+    - title: Security and Privacy
+      url: https://github.com/visorcraft/Grex/blob/master/SECURITY.md

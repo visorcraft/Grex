@@ -1,182 +1,302 @@
 <!-- SPDX-FileCopyrightText: 2026 VisorCraft LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 
-# Security and Privacy Policy
+# Security and Privacy
 
-Grex is a developer tool that reads (and optionally writes) arbitrary
-local files, can attach to Docker containers and WSL distributions,
-and can optionally send a small context payload to an AI endpoint.
-This document records the threat model, the data Grex touches, and the
-policies it enforces.
+Grex searches user-selected files, can overwrite matches, can execute search commands in WSL and Docker containers, and can send metadata to a configured AI endpoint. Read this page before using Replace, Docker, WSL, or AI features on sensitive systems.
 
-## Reporting a vulnerability
+## Report a vulnerability
 
-**Do not file a public GitHub issue, discussion, or pull request for
-security problems.** Report privately through **GitHub's private
-vulnerability reporting**:
+Do not open a public issue, discussion, or pull request for a suspected vulnerability.
 
-1. Go to the repository's **Security** tab.
-2. Click **Report a vulnerability**.
-3. Fill in the advisory form with the details below.
+Use [GitHub private vulnerability reporting](https://github.com/visorcraft/Grex/security/advisories/new).
 
-This keeps the report confidential between you and the maintainers
-until a fix is ready. Please include as much as you can:
+Include:
 
-- a description of the issue and its impact,
-- step-by-step reproduction steps,
-- the Grex version (`Help → About`) and your Windows build,
-- the relevant configuration, logs, or a proof-of-concept,
-- a suggested fix or mitigation, if you have one.
+- affected Grex version;
+- Windows version and architecture;
+- target type: local, UNC, WSL, Docker, CLI, or AI;
+- impact and realistic attack scenario;
+- minimal reproduction steps or proof of concept;
+- relevant configuration and redacted logs;
+- suggested mitigation, if known.
 
-### What to expect
-
-- **Acknowledgement** of your report within a few days.
-- An initial assessment and, where confirmed, a remediation plan.
-- Progress updates through the private advisory thread until the
-  issue is resolved.
-- Credit for your responsible disclosure in the advisory, unless you
-  prefer to remain anonymous.
-
-We ask that you give us a reasonable opportunity to ship a fix before
-any public disclosure.
+Do not include real API keys, private file contents, or credentials. Maintainers will coordinate validation, remediation, release, and disclosure in the private advisory.
 
 ## Supported versions
 
-The latest stable release of Grex is supported with security fixes.
-Older versions receive fixes only when the patch is trivial to
-backport. The "About" dialog and the GitHub Releases page are the
-canonical version sources.
+| Version | Security support |
+| --- | --- |
+| Latest stable release | Supported |
+| Older releases | Upgrade required unless a backport is announced |
+| Source snapshots | Best effort only |
 
-## Telemetry policy
+The [latest GitHub release](https://github.com/visorcraft/Grex/releases/latest) and **About** page are the version sources.
 
-**Grex ships zero telemetry.** No analytics, no crash reports, no
-ping-home behavior. Opt-in diagnostics surface as local log files
-under `%LOCALAPPDATA%\Grex\logs\`, never as outbound traffic.
+## Security model
 
-A future "diagnostics" feature, if added, must:
+Grex is a desktop tool running with the current user's permissions. It is not a sandbox.
 
-- be off by default,
-- redact every path / search term before submission,
-- surface a one-time consent dialog,
-- target a documented, versioned endpoint.
+- A search root is a scope request, not a security boundary.
+- Hidden, system, `.gitignore`, binary, and directory exclusions are convenience filters, not access controls.
+- Enabling symbolic links can traverse outside the apparent root.
+- UNC access uses credentials already available to Windows.
+- WSL commands run with the selected distribution's current user.
+- Docker access has the privileges of the configured Docker daemon connection.
+- Opening a result invokes Windows, Explorer, WSL path conversion, or the default file handler.
 
-## Outbound traffic
+Do not run Grex with more privilege than required.
 
-Grex makes network requests in exactly two situations:
+## Local data
 
-1. **AI Search Chat** - only when the AI feature is enabled AND the
-   user has supplied an endpoint + API key AND they explicitly invoke
-   the AI panel. The allowed endpoint set is OpenAI-compatible
-   servers configured by the user.
-2. **Endpoint test** (`Settings → AI → Test endpoint`) - a single
-   request against the user-supplied endpoint to verify connectivity.
+Grex persists:
 
-No other Grex subsystem opens a socket. Update checks, telemetry, and
-crash uploads do not exist.
+| Data | Location | Sensitive content |
+| --- | --- | --- |
+| Settings | `%LocalAppData%\Grex\settings.json` | Preferences, AI endpoint, plain-text API key, model |
+| Recent paths | `%LocalAppData%\Grex\search_path_history.json` | Search roots |
+| Search history | `%LocalAppData%\Grex\search_history.json` | Queries, paths, selected filters, counts |
+| Search profiles | `%LocalAppData%\Grex\search_profiles.json` | Named paths, queries, and filters |
+| Docker mirrors | `%LocalAppData%\Grex\docker-mirrors\` | Temporary copies of container files |
+| Application log | `%Temp%\Grex.log` | Errors, diagnostics, and sometimes paths |
+| Notification test log | `%LocalAppData%\Grex\notification_test.log` | Notification diagnostics |
 
-## Local file access
+Search result collections and AI conversations remain in process memory for the tab. Search results are not saved to a Grex database. Exports are written only when the user chooses a destination or clipboard action.
 
-- **Search** reads files the user explicitly points at. Default
-  exclusions include `bin`, `obj`, `node_modules`, `.git`, `vendor`,
-  and Windows system roots when not explicitly opted in.
-- **Replace** writes via atomic temp-file-then-rename on the same
-  volume. NTFS permissions are preserved. A journal at
-  `%LOCALAPPDATA%\Grex\replace-journal.json` records each file the
-  replace pipeline modifies; the journal is rotated on clean exit.
-- **UNC shares** are accessed using the credentials of the running
-  user - Grex does not prompt for, store, or transmit network
-  credentials.
-- **WSL search** invokes `wsl.exe` against the user-selected
-  distribution and runs `grep`-equivalents inside it. Grex does not
-  elevate to root inside the distribution or modify its rootfs during
-  search.
-- **Container search** uses the Docker API (`Docker.DotNet`) to
-  `exec` `grep` inside the container. Grex never runs privileged
-  container operations and never writes to a container during a
-  search.
+Uninstalling does not remove `%LocalAppData%\Grex`.
+
+## Search and file access
+
+Local search:
+
+- enumerates files under the selected root;
+- ignores inaccessible entries where possible;
+- reads files with the current user's permissions;
+- reads up to 64 KB for encoding detection;
+- streams ordinary text files;
+- can read whole ZIP entries or PDF files for document extraction;
+- can follow reparse points when symbolic links are enabled.
+
+Windows Search mode asks the local Windows Search service for candidate paths, then reads candidate files to confirm results.
+
+UNC search uses Windows filesystem APIs and the current user's existing share/session credentials. Grex does not implement a credential prompt or credential store for shares.
 
 ## Replace risks
 
-- **No undo.** Replace writes are committed atomically. The journal
-  records *which* files were modified but not their previous content.
-  Users who need rollback should snapshot the tree first (Git stash,
-  Volume Shadow Copy, `xcopy` snapshot, etc.).
-- **Archived documents are never modified.** OOXML / ODF / ZIP / PDF /
-  RTF files are extracted read-only for search and skipped by the
-  replace pipeline.
-- **Containers and WSL are read-only.** The container and WSL adapters
-  have no replace entry point; the search engine refuses to write to
-  them.
-- **System directories require an explicit opt-in.** Replace targeting
-  `C:\Windows`, `C:\ProgramData`, `Program Files`, or `Program Files
-  (x86)` is gated behind a confirmation dialog and a settings flag.
+> Replace has no undo, rollback, journal, transaction, recycle-bin integration, or automatic backup.
 
-## Container and WSL access
+Windows and UNC replacement:
 
-Mounting a Docker socket or invoking `wsl.exe` grants substantial
-privileges to the running process. Grex relies on the user's existing
-group membership / WSL configuration and never installs helpers, never
-elevates on its own, and never writes to a container or distribution
-during a search.
+- reads the full eligible file;
+- applies text or .NET Regex replacement;
+- overwrites the original path directly with `File.WriteAllText`;
+- processes up to eight files concurrently;
+- skips files over 100 MB;
+- skips some read/write failures without restoring earlier changes.
 
-The Settings UI must surface "this is privileged access" explicitly
-when the user enables container search or WSL search for the first
-time.
+WSL replacement:
 
-## API key handling
+- identifies files with `find`/`grep` or `git grep`;
+- applies Match Files and Exclude Dirs before writing;
+- passes the `sed` expression and target path as separate process arguments;
+- applies `sed -i -E`;
+- treats replacement text literally. Regex mode affects only the search pattern.
 
-API keys for the AI endpoint are stored in the **Windows Credential
-Manager** through the `PasswordVault` API.
+Cancellation stops future work but does not restore files already written. A process or power failure can leave a partial change set.
 
-- Resource: `com.visorcraft.Grex.ai`
-- UserName: canonical endpoint base URL
-- Multiple endpoints can each have their own key without overwriting.
+Docker replacement is disabled.
 
-**No plaintext fallback.** If Credential Manager is unavailable (for
-example in a restricted enterprise lockdown profile), the AI panel
-surfaces the error verbatim and refuses to store the key.
+Binary/document extraction is not paired with a safe writer. Replace therefore skips known binary, archive, and document formats even when **Include binary files** is enabled.
 
-API keys are excluded from:
+Use source control, a snapshot, or a separate backup before replacement. Review the same search in Content/Files mode first.
 
-- Settings exports (`Settings → Export…`)
-- `ILogger` output (the AI client never logs the value)
-- Screenshots / diagnostics packages
-- The replace journal
+## AI endpoint and API key
 
-## Path redaction in diagnostics
+AI is optional and user-triggered.
 
-The CLI logs to `%LOCALAPPDATA%\Grex\logs\grex.log` by default. The
-default fields are search root, query, regex flag, case sensitivity,
-and gitignore flag - none of which would be considered a secret by
-themselves.
+### Storage
 
-A future privacy-mode toggle will redact:
+The API key is stored as plain text in:
 
-- Path prefixes outside `%USERPROFILE%`
-- The search term
-- The replacement string
-- The detected encoding label for content under
-  `C:\Windows\`, `C:\ProgramData\`, and `C:\Program Files*\`
+```text
+%LocalAppData%\Grex\settings.json
+```
 
-## Threat model summary
+The Settings UI uses a `PasswordBox`, but that masks display only. Grex does not use Windows Credential Manager or encryption.
 
-| Threat | Mitigation |
-| ------ | ---------- |
-| User searches a malicious archive on their disk | Grex reads bytes, never executes. Document extraction goes through hardened parsers (`System.IO.Packaging` for OOXML, `iText` for PDF) running in-process without shell expansion. |
-| User replaces something they didn't intend | Confirmation dialog before replace; journal records the change set; atomic rename means files are either fully replaced or untouched. |
-| AI endpoint is malicious (crafted JSON response) | The client deserializes with `System.Text.Json` (no script eval), surfaces errors through typed result models, and never executes content. |
-| Container `docker exec` injection | Every argv passed to the Docker API is built as a `List<string>`, not concatenated; integration tests pin this. |
-| WSL command injection | The WSL adapter builds `wsl.exe` argv as a list and does not pass user input through `cmd /c`. |
-| Stale temp file leaks data | Replace writes use `TempFile` patterns scoped to the target volume; the journal is the source of truth and is removed on clean exit. |
-| Credential Manager unavailable, user tries to enable AI | The vault call surfaces the error; the UI refuses to fall back to plaintext storage. |
-| Logs accidentally capture an API key | The AI client and credential layer never log the key value. |
-| Search root is the whole drive | System-dir auto-exclusions kick in unless the user opts in to system search; tests in `Tests/Grex.Tests/RootSafetyTests.cs` pin the behavior. |
+Settings export includes the key. Settings import accepts and stores it. Protect settings files and exports, avoid committing them, and remove keys before sharing diagnostics.
 
-## Dependency hygiene
+### Requests
 
-- NuGet license metadata is reviewed against the GPL-3.0 compatibility
-  matrix during dependency upgrades.
-- `dotnet list package --vulnerable` is the pre-release security check.
-- Dependabot opens weekly PRs for transitive and direct updates.
-- Vulnerabilities discovered after release are tracked through GitHub
-  Security Advisories on this repository.
+Grex makes AI requests when:
+
+- the user selects **Test Endpoint**, which sends a Models request;
+- the user starts AI chat or sends a follow-up, which can perform model discovery and sends Chat Completions.
+
+The chat request includes:
+
+- search path;
+- search query;
+- Text/Regex mode;
+- Content/Files mode;
+- active filter suggestions;
+- current tab conversation history, capped at 200 messages.
+
+Grex does not automatically include:
+
+- file contents;
+- search result rows;
+- replacement text;
+- recent search/profile files;
+- arbitrary directory listings.
+
+User-entered chat text can still contain sensitive information. The configured provider receives and may retain request metadata according to its own policy.
+
+### Transport
+
+Grex prepends `https://` when a scheme is absent, but accepts an explicitly configured `http://` endpoint. Use HTTPS except for an isolated local service.
+
+Bearer authentication is added only when a key is non-empty. Validate certificate and endpoint ownership outside Grex for high-sensitivity use.
+
+### Endpoint trust
+
+The endpoint response is parsed as JSON and displayed as text. Grex does not execute model output. However:
+
+- endpoint errors can be written to logs;
+- a malicious endpoint sees request metadata;
+- a model can provide unsafe instructions;
+- the user remains responsible for commands or edits performed after reading a response.
+
+## Network and external-process behavior
+
+| Feature | Connection or process | Trigger |
+| --- | --- | --- |
+| AI model test | HTTP GET to configured endpoint | Test Endpoint |
+| AI chat | HTTP GET/POST to configured endpoint | AI discussion |
+| Docker availability/list/mirror | `docker.exe`, local Docker daemon, `tar.exe` | Docker enabled/selected |
+| Docker direct search | Docker API exec of `which`, `sh`, `find`, `grep`, `cat` | Container search |
+| WSL search/replace | `wsl.exe` running shell tools | WSL path |
+| UNC search | Windows network filesystem | UNC path |
+| Windows Search | Local Windows Search service via OleDb | Toggle enabled |
+| Open result | Explorer/default application/process | User action |
+
+Grex does not implement an automatic update checker, analytics client, crash uploader, or background telemetry sender.
+
+Operating-system components, the Windows App Runtime, Docker, WSL, default file handlers, and configured AI providers have their own privacy and update behavior.
+
+## Docker access
+
+Access to a Docker daemon is often equivalent to broad host control. Enable Docker search only for a daemon and containers you trust.
+
+Direct Docker search:
+
+- creates exec processes inside an existing running container;
+- runs `sh -c` with argument-quoted `find -exec ... grep`;
+- may read `<search-root>/.gitignore` with `cat`;
+- does not start, stop, create, remove, or privilege-escalate containers.
+
+Mirror fallback:
+
+- copies selected container content to the host;
+- normally creates a temporary tar archive under container `/tmp`;
+- copies and extracts that archive;
+- attempts to delete container and host temporary data;
+- can leave temporary data after a crash, cancellation, permission failure, or cleanup error.
+
+Mirrors can contain secrets from the container. Grex cleans the active mirror when the target changes, Docker is disabled, or the tab closes, but cleanup is best effort. A six-hour pruning helper exists in the service but the current app does not invoke it automatically. Inspect `%LocalAppData%\Grex\docker-mirrors` after interrupted or sensitive searches.
+
+Docker commands run with the current daemon's existing authorization. Grex does not provide a separate allowlist or read-only Docker credential.
+
+## WSL access
+
+Grex constructs and runs WSL shell commands for search and replacement. Search commands read under the selected root; replacement modifies files with `sed -i`.
+
+Risks:
+
+- Linux shell and grep/Regex syntax differs from .NET;
+- Regex patterns use the target's extended regular-expression syntax;
+- an explicit `\\wsl$\<distro>` path selects that distribution;
+- a plain Linux path uses the default distribution;
+- current WSL user permissions apply;
+- no container or filesystem snapshot is created.
+
+Use a disposable test tree before relying on WSL Replace with complex Regex patterns.
+
+## Logs and diagnostics
+
+`%Temp%\Grex.log` is capped near 1 MB and trimmed to retain roughly the newest 512 KB. It can include:
+
+- file paths;
+- process or endpoint errors;
+- Regex timeout file names;
+- stack traces;
+- platform diagnostic details.
+
+It should not intentionally log the AI key, but treat the entire file as sensitive. Inspect and redact it before attaching to an issue.
+
+Settings notification/localization tests can create extra diagnostic output. Run them only when needed.
+
+## Telemetry and retention
+
+The Grex application contains no analytics, usage telemetry, crash reporting, or update-check implementation.
+
+Local history exists for usability and has explicit caps. Clear it from the UI or delete the relevant JSON files when working with sensitive paths or queries.
+
+AI retention is controlled by the configured endpoint, not Grex. Docker/WSL/UNC activity can also appear in platform logs outside Grex.
+
+## Release integrity
+
+Official binaries are attached to this repository's GitHub Releases. Current Windows executables and installer are not code-signed.
+
+Before running a release:
+
+1. use the canonical `https://github.com/visorcraft/Grex/releases` page;
+2. compare the asset's GitHub-displayed SHA-256 digest;
+3. inspect release/tag provenance;
+4. avoid third-party mirrors.
+
+PowerShell:
+
+```powershell
+Get-FileHash .\grex-<version>-setup.exe -Algorithm SHA256
+```
+
+## Dependency security
+
+Maintainers should:
+
+- review direct and transitive NuGet changes;
+- run `dotnet list package --vulnerable`;
+- keep `Assets/third-party-licenses.json` current;
+- regenerate `THIRD-PARTY-NOTICES.txt`;
+- run the complete Windows test gate before tagging;
+- use private advisories for coordinated fixes.
+
+The release workflow builds and tests tagged source before packaging. Maintainers should still run the complete Windows test gate before tagging.
+
+## Hardening recommendations
+
+- Run non-elevated.
+- Search the narrowest root needed.
+- Leave system, hidden, binary, and symbolic-link inclusion off unless required.
+- Back up before Replace.
+- Prefer explicit WSL distribution paths.
+- Treat Docker daemon access as privileged.
+- Use HTTPS for AI.
+- Use a low-scope provider key and rotate it if a settings file/export leaks.
+- Clear histories after sensitive work.
+- Review logs and mirrors before sharing or disposal.
+
+## Security non-goals
+
+Grex does not claim:
+
+- sandboxed filesystem access;
+- atomic or reversible replacement;
+- protection against malicious files or archives beyond ordinary parsing limits;
+- shell-command isolation for WSL/Docker adapters;
+- encrypted credential storage;
+- secure deletion;
+- a complete `.gitignore` security boundary;
+- signed release binaries;
+- endpoint identity beyond normal HTTPS validation.

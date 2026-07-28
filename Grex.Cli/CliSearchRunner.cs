@@ -45,7 +45,7 @@ public class CliSearchRunner
                 includeBinaryFiles: options.IncludeBinary,
                 includeSymbolicLinks: options.IncludeSymlinks,
                 sizeLimitType: sizeLimitType,
-                sizeLimitKB: ConvertToKB(options.SizeLimit, sizeUnit),
+                sizeLimitKB: options.SizeLimit,
                 sizeUnit: sizeUnit,
                 matchFileNames: options.MatchFiles ?? "",
                 excludeDirs: options.ExcludeDirs ?? "",
@@ -126,16 +126,4 @@ public class CliSearchRunner
         _ => SizeUnit.KB
     };
 
-    private static long? ConvertToKB(long? value, SizeUnit unit)
-    {
-        if (value == null)
-            return null;
-
-        return unit switch
-        {
-            SizeUnit.MB => value * 1024,
-            SizeUnit.GB => value * 1024 * 1024,
-            _ => value
-        };
-    }
 }

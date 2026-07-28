@@ -1,12 +1,18 @@
-title: Grex Docs
-description: Official Documentation for Grex, the Modern Tabbed File Search Tool.
+title: Grex Documentation
+description: User and developer documentation for Grex, a tabbed Windows grep application.
+url: https://visorcraft.github.io
+baseurl: /Grex
+repository: visorcraft/Grex
 theme: minima
+logo: /Grex/assets/img/logo.png
 header_pages:
   - usage.md
   - features.md
+  - reference.md
   - architecture.md
   - build-and-test.md
-logo: /assets/img/logo.png
+  - translations.md
 plugins:
   - jekyll-feed
-
+exclude:
+  - superpowers/

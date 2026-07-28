@@ -1,221 +1,291 @@
-# Translation and Localization Guide
+---
+title: Translation and Localization
+layout: default
+---
 
-## Overview
+# Translation and Localization
 
-Grex supports 100+ languages through Windows resource files (`.resw`). All UI text is localized through the `LocalizationService` and stored in `Strings/{culture}/Resources.resw` files.
+Grex uses Windows `.resw` resource catalogs under `Strings/<culture>/Resources.resw`.
 
-## Translation Status Tracking
+The repository currently contains:
 
-Each entry in a `.resw` file uses a `<comment>` child element to track translation status:
+- one source catalog: `Strings/en-US/Resources.resw`;
+- 107 non-English catalogs;
+- 476 English resource entries at the time of this documentation audit.
 
-### Status Values
+Non-English catalogs are not complete. Do not describe every listed locale as fully translated. Run the status script for current counts.
 
-- **`status:incomplete`** - Entry has not been translated yet (default for non-English files)
-- **`status:complete`** - Entry has been successfully translated
-- **`status:error:{error_details}`** - Translation failed with a specific error
-- **`status:error:permanent`** - Translation failed and should not be retried
+## Runtime behavior
 
-### Example Entries
+`LocalizationService`:
 
-**Incomplete (needs translation):**
+- loads strings for the selected culture;
+- falls back to `en-US` when possible;
+- returns the resource key when lookup fails;
+- formats parameterized strings;
+- updates thread culture;
+- raises `PropertyChanged` when culture changes;
+- caps cached resource contexts at 20.
+
+The Settings language list is built from culture directories that contain `Resources.resw`. If packaged resource files cannot be enumerated, the UI uses a fallback culture list.
+
+Views refresh dynamic text after a culture change. `LocalizedToolTipRegistry` refreshes registered tooltips. Some WinUI resource behavior may still require an application restart.
+
+## Resource lookup patterns
+
+### XAML resources
+
+Use `x:Uid` when WinUI can populate a static property:
+
 ```xml
-<data name="RegexBuilderTab" xml:space="preserve">
-  <value>Regex Builder</value>
-  <comment>status:incomplete</comment>
-</data>
+<Button x:Name="SearchButton"
+        x:Uid="SearchButton" />
 ```
 
-**Complete (translated):**
+The resource key includes the property:
+
 ```xml
-<data name="RegexBuilderTab" xml:space="preserve">
-  <value>Regex Builder</value>
+<data name="SearchButton.Content" xml:space="preserve">
+  <value>Search</value>
   <comment>status:complete</comment>
 </data>
 ```
 
-**Error (translation failed):**
+### C# resources
+
+Use the localization service for runtime strings:
+
+```csharp
+var text = LocalizationService.Instance.GetLocalizedString("SearchErrorTitle");
+var formatted = LocalizationService.Instance.GetLocalizedString(
+    "FoundMatchesStatus",
+    matchCount,
+    fileCount,
+    elapsed);
+```
+
+Do not hard-code user-facing English in C# or XAML fallback paths unless an existing compatibility pattern requires it.
+
+Regex Builder strings follow this same system. See [Regex Builder Localization](regex-localization.md) for its resource families and focused validation steps.
+
+## Status comments
+
+Every `<data>` entry should have one status comment.
+
+| Comment | Meaning |
+| --- | --- |
+| `status:complete` | Reviewed translation |
+| `status:incomplete` | English placeholder or unreviewed translation |
+| `status:error:<details>` | Automatic translation failed |
+| `status:error:permanent` | Do not retry automatically |
+
+English entries use `status:complete`.
+
+Example:
+
 ```xml
-<data name="RegexBuilderTab" xml:space="preserve">
-  <value>Regex Builder</value>
-  <comment>status:error:Could not perform translation because XYZ</comment>
+<data name="NewFeatureButton.Content" xml:space="preserve">
+  <value>New feature</value>
+  <comment>status:incomplete</comment>
 </data>
 ```
 
-**Permanent Error (will not retry):**
-```xml
-<data name="RegexBuilderTab" xml:space="preserve">
-  <value>Regex Builder</value>
-  <comment>status:error:permanent</comment>
-</data>
+## Add a resource key
+
+English is the source of truth.
+
+1. Add the key and English text to `Strings/en-US/Resources.resw` with `status:complete`.
+2. From the repository root, propagate the same key:
+
+   ```powershell
+   python Scripts/add_localization_entry.py "NewFeatureButton.Content" "New feature"
+   ```
+
+3. The script skips the existing English key and adds an English placeholder with `status:incomplete` to other catalogs.
+4. Translate and review the affected non-English entries.
+5. Run script tests and the Windows .NET tests.
+
+The add script:
+
+- discovers `Strings/*/Resources.resw`;
+- does not overwrite an existing key;
+- escapes XML through `xml.etree.ElementTree`;
+- reports added and skipped catalogs.
+
+## Remove a resource key
+
+Use the removal script rather than hand-editing 108 files:
+
+```powershell
+python Scripts/remove_localization_entry.py "OldFeatureButton.Content"
 ```
 
-## Adding New UI Text
+Then search for remaining code/XAML references:
 
-**IMPORTANT**: When adding new UI text to the application:
+```powershell
+rg -n "OldFeatureButton" Controls ViewModels Services MainWindow.xaml MainWindow.xaml.cs
+```
 
-1. **Route through LocalizationService**: All new UI text must be added to the resource files, not hardcoded in the application.
+Review the diff before committing.
 
-2. **Use the add_localization_entry.py script (RECOMMENDED)**: This script automatically adds entries to all 100+ language files at once:
+## Update existing text
 
-   ```bash
-   python Scripts/add_localization_entry.py "<key>" "<value>"
-   ```
+When changing an English message:
 
-   **Example:**
-   ```bash
-   python Scripts/add_localization_entry.py "NewFeatureButton.Content" "New Feature"
-   ```
+1. update `en-US`;
+2. identify every catalog containing the key;
+3. preserve placeholders and XML whitespace;
+4. mark stale non-English values `status:incomplete`;
+5. translate and review;
+6. run the status report.
 
-   The script automatically:
-   - Adds the entry to all `.resw` files in the Strings directory
-   - Sets `status:complete` for en-US (English)
-   - Sets `status:incomplete` for all other languages (needs translation)
-   - Skips files where the key already exists (with a warning)
-   - Preserves XML formatting and indentation
+Do not silently leave a previously translated value attached to changed English semantics.
 
-3. **Manual method (alternative)**: If you need to add entries manually:
+## Formatting rules for translators
 
-   **Add to English file first**: Add the entry to `Strings/en-US/Resources.resw` with:
-   - The English text as the `<value>`
-   - `<comment>status:complete</comment>` (English is always complete)
+Preserve:
 
-   **Add to all language files**: The same entry must be added to **all 100+ language files** with:
-   - The English text as a placeholder in the `<value>`
-   - `<comment>status:incomplete</comment>` (default for non-English files)
+- format placeholders such as `{0}`, `{1}`, and `{2}`;
+- literal command names, flags, paths, and file extensions;
+- keyboard names;
+- XML escaping;
+- leading/trailing whitespace when meaningful;
+- punctuation required by the UI;
+- accelerator or glyph text used by controls.
 
-4. **Example entry format:**
-   
-   **English (Strings/en-US/Resources.resw):**
-   ```xml
-   <data name="NewFeatureButton.Content" xml:space="preserve">
-     <value>New Feature</value>
-     <comment>status:complete</comment>
-   </data>
-   ```
-   
-   **All other languages (e.g., Strings/es-ES/Resources.resw):**
-   ```xml
-   <data name="NewFeatureButton.Content" xml:space="preserve">
-     <value>New Feature</value>
-     <comment>status:incomplete</comment>
-   </data>
-   ```
+Do not translate:
 
-5. **Use the translation script**: Run `python Scripts/translate_remaining_entries.py` to automatically translate all incomplete entries.
+- `Grex`;
+- API model ids;
+- command names such as `grep`, `docker`, `wsl`, and `grex-cli`;
+- CLI options such as `--gitignore`;
+- technical units such as KB, MB, and GB;
+- file or resource keys.
 
-## Automated Translation
+Keep translations concise enough for the existing control. Test long strings and right-to-left scripts in the running app.
 
-The `Scripts/translate_remaining_entries.py` script automatically translates entries:
+## Automated translation
 
-### What it does:
+`Scripts/translate_remaining_entries.py` can process incomplete entries with the optional `googletrans` package:
 
-1. **Finds entries to translate**: Only entries that are exact matches to the English value and have `status:incomplete` or `status:error` (not permanent)
-
-2. **Skips completed entries**: Entries with `status:complete` are never processed
-
-3. **Skips permanent errors**: Entries with `status:error:permanent` are never processed
-
-4. **Marks existing translations**: If an entry's value doesn't match English, it's automatically marked as `status:complete`
-
-5. **Creates missing comments**: If an entry has no `<comment>` element, one is created:
-   - `status:complete` for English file
-   - `status:incomplete` for other files (if value matches English)
-   - `status:complete` for other files (if value differs from English)
-
-6. **Handles errors gracefully**: If translation fails:
-   - First failure: Marks as `status:error:{error_details}`
-   - Subsequent failure: Marks as `status:error:permanent` (won't retry)
-
-7. **Never overwrites**: The script never overwrites existing translations, even if they look like English
-
-### Running the script:
-
-```bash
+```powershell
+python -m pip install googletrans==4.0.0rc1
 python Scripts/translate_remaining_entries.py
 ```
 
-The script will:
-- Process all languages alphabetically
-- Only translate entries that exactly match English
-- Update comment status as it goes
-- Handle rate limiting automatically
+Without `googletrans`, the script identifies work but cannot translate it.
 
-## Manual Translation
+The script:
 
-If you need to manually translate entries:
+- compares non-English values with English;
+- skips complete and permanent-error entries;
+- maps Windows culture codes to provider language codes;
+- marks successful values complete;
+- records transient or permanent errors;
+- avoids overwriting values already different from English.
 
-1. Open the appropriate `Strings/{culture}/Resources.resw` file
-2. Find the entry you want to translate
-3. Update the `<value>` element with the translated text
-4. Update the `<comment>` element to `status:complete`
+Machine translation is a draft, not approval. Review terminology, placeholders, directionality, truncation, and feature context before changing a status to complete.
 
-## Technical Terms
+The translation provider is external. Do not place secrets or private product text in resource values submitted to it.
 
-Some entries are kept in English across all languages (technical terms, proper nouns, etc.). These are handled automatically by the translation scripts and should not be translated manually.
+## Report translation status
 
-## File Structure
+Run:
 
-All language files follow the same structure:
-- Location: `Strings/{culture-code}/Resources.resw`
-- Format: XML with `<data>`, `<value>`, and `<comment>` elements
-- Encoding: UTF-8
-
-## Best Practices
-
-1. **Always add comments**: Every entry must have a `<comment>` element
-2. **Use exact matching**: Only translate entries that exactly match English
-3. **Never overwrite**: Don't replace existing translations with English text
-4. **Test translations**: Verify translations make sense in context
-5. **Keep technical terms**: Don't translate technical terms, proper nouns, or acronyms that should stay in English
-
-## Translation Tools
-
-- **Add Entry**: `Scripts/add_localization_entry.py` - Adds a new localization entry to all 100+ language files at once
-  ```bash
-  python Scripts/add_localization_entry.py "<key>" "<value>"
-  ```
-- **Remove Entry**: `Scripts/remove_localization_entry.py` - Removes a localization entry from all 100+ language files at once
-  ```bash
-  python Scripts/remove_localization_entry.py "<key>"
-  ```
-- **Automated Translation**: `Scripts/translate_remaining_entries.py` - Uses Google Translate API to translate entries marked as `status:incomplete`
-- **Status Check**: `Scripts/generate_translation_status.py` - Reports translation status of all language translations
-
-### Running the Scripts
-
-All scripts are located in the `Scripts/` directory and can be run from the project root:
-
-```bash
-# Add a new localization entry to all languages
-python Scripts/add_localization_entry.py "MyButton.Content" "My Button"
-
-# Remove a localization entry from all languages
-python Scripts/remove_localization_entry.py "OldButton.Content"
-
-# Translate all incomplete entries
-python Scripts/translate_remaining_entries.py
-
-# Check translation status
+```powershell
 python Scripts/generate_translation_status.py
 ```
 
-### Testing the Scripts
+The report:
 
-Unit tests for the localization scripts are available:
+- parses the English key set;
+- counts complete, incomplete, and error entries per locale;
+- summarizes locale status;
+- lists locales nearest completion;
+- lists translation errors.
 
-```bash
-# Run tests with pytest (if pytest installed)
-python -m pytest Scripts/test_add_localization_entry.py -v
-python -m pytest Scripts/test_remove_localization_entry.py -v
+This output is authoritative. Counts in prose can become stale.
 
-# Or run tests directly with unittest
+## Test localization scripts
+
+Standard library:
+
+```powershell
 python Scripts/test_add_localization_entry.py
 python Scripts/test_remove_localization_entry.py
 ```
 
-## Support
+With pytest:
 
-For questions or issues with translations, refer to:
-- `README.md` - General localization information
-- `docs/architecture.md` - LocalizationService architecture
+```powershell
+python -m pytest Scripts/test_add_localization_entry.py Scripts/test_remove_localization_entry.py
+```
 
+On Windows, run localization-focused .NET tests:
+
+```powershell
+dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~Localization"
+dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~RegexBuilderLanguage"
+dotnet test IntegrationTests/Grex.IntegrationTests.csproj -p:Platform=x64 --filter "FullyQualifiedName~AiSearchLocalization"
+```
+
+Then manually verify:
+
+1. Settings language list;
+2. Search, Regex Builder, Settings, About, and Credits;
+3. tooltips;
+4. dialogs and notifications;
+5. result/status pluralization;
+6. restart persistence;
+7. fallback for an intentionally missing key.
+
+## Line endings
+
+All `.resw` files are CRLF. Python's XML writer emits platform-native newlines, so running mutation scripts on Linux or macOS can turn every line into LF.
+
+Before editing on any platform:
+
+```powershell
+git config core.autocrlf false
+git ls-files --eol Strings/en-US/Resources.resw
+```
+
+Expected index form:
+
+```text
+i/crlf
+```
+
+After running a script:
+
+```powershell
+git diff --stat -- Strings
+git ls-files --eol Strings/en-US/Resources.resw
+```
+
+On Linux or macOS, convert changed `.resw` files back to CRLF before committing. Avoid a repository-wide line-ending diff.
+
+## Add a language
+
+1. Choose a valid Windows culture code, such as `xx-YY`.
+2. Copy the English catalog to `Strings/xx-YY/Resources.resw`.
+3. Keep the same key set and XML structure.
+4. Set non-English entries to `status:incomplete`.
+5. Translate and review.
+6. Run the status report.
+7. Build on Windows so PRI resource generation validates the culture.
+8. Verify the language appears in Settings and survives restart.
+
+`Grex.csproj` includes `Strings\**\Resources.resw` as PRI resources, so no per-language project entry is normally needed.
+
+## Review checklist
+
+- Every English key exists once.
+- Every changed key exists in every catalog.
+- Format placeholders match English.
+- No user-facing text was added outside localization.
+- Status comments match review state.
+- `.resw` files remain CRLF.
+- Script and .NET localization tests pass.
+- Dynamic language switching was checked.
+- Machine-translated text received human review.

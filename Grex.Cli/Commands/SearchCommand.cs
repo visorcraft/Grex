@@ -47,11 +47,11 @@ public static class SearchCommand
         // File filter options
         var matchFilesOpt = new Option<string?>(
             new[] { "-m", "--match-files" },
-            "File name pattern (e.g., *.cs;*.txt)");
+            "File name pattern (e.g., *.cs|*.txt)");
 
         var excludeDirsOpt = new Option<string?>(
             new[] { "-x", "--exclude-dirs" },
-            "Directories to exclude (semicolon-separated)");
+            "Directories to exclude (comma-separated names or regex)");
 
         var sizeLimitOpt = new Option<long?>(
             "--size-limit",

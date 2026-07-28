@@ -225,7 +225,7 @@ namespace Grex.Tests.Services
         {
             // Arrange - Set some initial values
             SettingsService.SetDefaultIsRegexSearch(false);
-            SettingsService.SetDefaultRespectGitignore(false);
+            SettingsService.SetDefaultRespectGitignore(true);
             SettingsService.SetThemePreference(ThemePreference.System);
             
             // Only update IsRegexSearch
@@ -241,8 +241,8 @@ namespace Grex.Tests.Services
             // Assert
             success.Should().BeTrue();
             settings.IsRegexSearch.Should().BeTrue();
-            // Other settings should be updated to their defaults from the partial JSON
-            // (since the partial JSON has defaults for missing properties)
+            settings.RespectGitignore.Should().BeTrue();
+            settings.ThemePreference.Should().Be(ThemePreference.System);
         }
 
         [Fact]
@@ -261,6 +261,16 @@ namespace Grex.Tests.Services
             // Assert
             success.Should().BeTrue();
             errorMessage.Should().BeNull();
+        }
+
+        [Fact]
+        public void ImportSettingsFromJson_WithInvalidEnum_ReturnsError()
+        {
+            var (success, errorMessage) = SettingsService.ImportSettingsFromJson(
+                @"{ ""SizeUnit"": 99 }");
+
+            success.Should().BeFalse();
+            errorMessage.Should().Contain("invalid option value");
         }
 
         [Fact]
@@ -284,8 +294,10 @@ namespace Grex.Tests.Services
 
             // Assert - Window position should NOT be changed (we intentionally don't import it)
             success.Should().BeTrue();
-            // Note: The current implementation does import these values, but the design
-            // comment in the code says it intentionally doesn't. We should verify actual behavior.
+            x.Should().Be(100);
+            y.Should().Be(100);
+            width.Should().Be(800);
+            height.Should().Be(600);
         }
 
         #endregion
@@ -351,8 +363,13 @@ namespace Grex.Tests.Services
             SettingsService.SetDefaultIncludeHiddenItems(true);
             SettingsService.SetDefaultIncludeBinaryFiles(true);
             SettingsService.SetDefaultIncludeSymbolicLinks(true);
+            SettingsService.SetEnableDockerSearch(true);
             SettingsService.SetThemePreference(ThemePreference.Dark);
             SettingsService.SetUILanguage("ja-JP");
+            SettingsService.SetDefaultMatchFiles("*.cs");
+            SettingsService.SetDefaultExcludeDirs("bin,obj");
+            SettingsService.SetContextPreviewLinesBefore(7);
+            SettingsService.SetContextPreviewLinesAfter(9);
             SettingsService.SetAiSearchEndpoint("https://api.roundtrip.test/v1");
             SettingsService.SetAiSearchApiKey("roundtrip-key");
             SettingsService.SetAiSearchModel("o4-mini");
@@ -380,8 +397,13 @@ namespace Grex.Tests.Services
             importedSettings.IncludeHiddenItems.Should().BeTrue();
             importedSettings.IncludeBinaryFiles.Should().BeTrue();
             importedSettings.IncludeSymbolicLinks.Should().BeTrue();
+            importedSettings.EnableDockerSearch.Should().BeTrue();
             importedSettings.ThemePreference.Should().Be(ThemePreference.Dark);
             importedSettings.UILanguage.Should().Be("ja-JP");
+            importedSettings.DefaultMatchFiles.Should().Be("*.cs");
+            importedSettings.DefaultExcludeDirs.Should().Be("bin,obj");
+            importedSettings.ContextPreviewLinesBefore.Should().Be(7);
+            importedSettings.ContextPreviewLinesAfter.Should().Be(9);
             importedSettings.AiSearchEndpoint.Should().Be("https://api.roundtrip.test/v1");
             importedSettings.AiSearchApiKey.Should().Be("roundtrip-key");
             importedSettings.AiSearchModel.Should().Be("o4-mini");

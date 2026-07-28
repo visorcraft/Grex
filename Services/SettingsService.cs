@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text.Json;
@@ -515,64 +516,83 @@ namespace Grex.Services
                         AllowTrailingCommas = true
                     };
 
+                    using var document = JsonDocument.Parse(json, new JsonDocumentOptions
+                    {
+                        CommentHandling = JsonCommentHandling.Skip,
+                        AllowTrailingCommas = true
+                    });
+                    if (document.RootElement.ValueKind != JsonValueKind.Object)
+                    {
+                        return (false, "Invalid settings file format.");
+                    }
+
                     var importedSettings = JsonSerializer.Deserialize<DefaultSettings>(json, options);
                     if (importedSettings == null)
                     {
                         return (false, "Invalid settings file format.");
                     }
 
+                    var importedProperties = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var property in document.RootElement.EnumerateObject())
+                    {
+                        importedProperties.Add(property.Name);
+                    }
+                    bool Has(string propertyName) => importedProperties.Contains(propertyName);
+                    
+                    if ((Has(nameof(DefaultSettings.SizeUnit)) &&
+                         !Enum.IsDefined(typeof(Models.SizeUnit), importedSettings.SizeUnit)) ||
+                        (Has(nameof(DefaultSettings.ThemePreference)) &&
+                         !Enum.IsDefined(typeof(ThemePreference), importedSettings.ThemePreference)) ||
+                        (Has(nameof(DefaultSettings.StringComparisonMode)) &&
+                         !Enum.IsDefined(typeof(Models.StringComparisonMode), importedSettings.StringComparisonMode)) ||
+                        (Has(nameof(DefaultSettings.UnicodeNormalizationMode)) &&
+                         !Enum.IsDefined(typeof(Models.UnicodeNormalizationMode), importedSettings.UnicodeNormalizationMode)))
+                    {
+                        return (false, "Settings file contains an invalid option value.");
+                    }
+                    
                     // Load current settings (or create new if none exist)
                     var currentSettings = LoadSettings();
                     
-                    // Merge the imported settings with the current settings
-                    // Only copy properties that have valid values
-                    currentSettings.IsRegexSearch = importedSettings.IsRegexSearch;
-                    currentSettings.IsFilesSearch = importedSettings.IsFilesSearch;
-                    currentSettings.RespectGitignore = importedSettings.RespectGitignore;
-                    currentSettings.SearchCaseSensitive = importedSettings.SearchCaseSensitive;
-                    currentSettings.IncludeSystemFiles = importedSettings.IncludeSystemFiles;
-                    currentSettings.IncludeSubfolders = importedSettings.IncludeSubfolders;
-                    currentSettings.IncludeHiddenItems = importedSettings.IncludeHiddenItems;
-                    currentSettings.IncludeBinaryFiles = importedSettings.IncludeBinaryFiles;
-                    currentSettings.IncludeSymbolicLinks = importedSettings.IncludeSymbolicLinks;
-                    currentSettings.UseWindowsSearchIndex = importedSettings.UseWindowsSearchIndex;
-                    currentSettings.SizeUnit = importedSettings.SizeUnit;
-                    currentSettings.ThemePreference = importedSettings.ThemePreference;
-                    
-                    if (!string.IsNullOrEmpty(importedSettings.UILanguage))
-                    {
-                        currentSettings.UILanguage = importedSettings.UILanguage;
-                    }
-                    
-                    currentSettings.StringComparisonMode = importedSettings.StringComparisonMode;
-                    currentSettings.UnicodeNormalizationMode = importedSettings.UnicodeNormalizationMode;
-                    currentSettings.DiacriticSensitive = importedSettings.DiacriticSensitive;
-                    
-                    if (!string.IsNullOrEmpty(importedSettings.Culture))
-                    {
-                        currentSettings.Culture = importedSettings.Culture;
-                    }
-                    
-                    // Content table column visibility
-                    currentSettings.ContentLineColumnVisible = importedSettings.ContentLineColumnVisible;
-                    currentSettings.ContentColumnColumnVisible = importedSettings.ContentColumnColumnVisible;
-                    currentSettings.ContentPathColumnVisible = importedSettings.ContentPathColumnVisible;
-                    
-                    // Files table column visibility
-                    currentSettings.FilesSizeColumnVisible = importedSettings.FilesSizeColumnVisible;
-                    currentSettings.FilesMatchesColumnVisible = importedSettings.FilesMatchesColumnVisible;
-                    currentSettings.FilesPathColumnVisible = importedSettings.FilesPathColumnVisible;
-                    currentSettings.FilesExtColumnVisible = importedSettings.FilesExtColumnVisible;
-                    currentSettings.FilesEncodingColumnVisible = importedSettings.FilesEncodingColumnVisible;
-                    currentSettings.FilesDateModifiedColumnVisible = importedSettings.FilesDateModifiedColumnVisible;
+                    if (Has(nameof(DefaultSettings.IsRegexSearch))) currentSettings.IsRegexSearch = importedSettings.IsRegexSearch;
+                    if (Has(nameof(DefaultSettings.IsFilesSearch))) currentSettings.IsFilesSearch = importedSettings.IsFilesSearch;
+                    if (Has(nameof(DefaultSettings.RespectGitignore))) currentSettings.RespectGitignore = importedSettings.RespectGitignore;
+                    if (Has(nameof(DefaultSettings.SearchCaseSensitive))) currentSettings.SearchCaseSensitive = importedSettings.SearchCaseSensitive;
+                    if (Has(nameof(DefaultSettings.IncludeSystemFiles))) currentSettings.IncludeSystemFiles = importedSettings.IncludeSystemFiles;
+                    if (Has(nameof(DefaultSettings.IncludeSubfolders))) currentSettings.IncludeSubfolders = importedSettings.IncludeSubfolders;
+                    if (Has(nameof(DefaultSettings.IncludeHiddenItems))) currentSettings.IncludeHiddenItems = importedSettings.IncludeHiddenItems;
+                    if (Has(nameof(DefaultSettings.IncludeBinaryFiles))) currentSettings.IncludeBinaryFiles = importedSettings.IncludeBinaryFiles;
+                    if (Has(nameof(DefaultSettings.IncludeSymbolicLinks))) currentSettings.IncludeSymbolicLinks = importedSettings.IncludeSymbolicLinks;
+                    if (Has(nameof(DefaultSettings.UseWindowsSearchIndex))) currentSettings.UseWindowsSearchIndex = importedSettings.UseWindowsSearchIndex;
+                    if (Has(nameof(DefaultSettings.EnableDockerSearch))) currentSettings.EnableDockerSearch = importedSettings.EnableDockerSearch;
+                    if (Has(nameof(DefaultSettings.SizeUnit))) currentSettings.SizeUnit = importedSettings.SizeUnit;
+                    if (Has(nameof(DefaultSettings.ThemePreference))) currentSettings.ThemePreference = importedSettings.ThemePreference;
+                    if (Has(nameof(DefaultSettings.UILanguage))) currentSettings.UILanguage = importedSettings.UILanguage ?? string.Empty;
+                    if (Has(nameof(DefaultSettings.StringComparisonMode))) currentSettings.StringComparisonMode = importedSettings.StringComparisonMode;
+                    if (Has(nameof(DefaultSettings.UnicodeNormalizationMode))) currentSettings.UnicodeNormalizationMode = importedSettings.UnicodeNormalizationMode;
+                    if (Has(nameof(DefaultSettings.DiacriticSensitive))) currentSettings.DiacriticSensitive = importedSettings.DiacriticSensitive;
+                    if (Has(nameof(DefaultSettings.Culture))) currentSettings.Culture = importedSettings.Culture ?? string.Empty;
+                    if (Has(nameof(DefaultSettings.DefaultMatchFiles))) currentSettings.DefaultMatchFiles = importedSettings.DefaultMatchFiles ?? string.Empty;
+                    if (Has(nameof(DefaultSettings.DefaultExcludeDirs))) currentSettings.DefaultExcludeDirs = importedSettings.DefaultExcludeDirs ?? string.Empty;
+                    if (Has(nameof(DefaultSettings.ContentLineColumnVisible))) currentSettings.ContentLineColumnVisible = importedSettings.ContentLineColumnVisible;
+                    if (Has(nameof(DefaultSettings.ContentColumnColumnVisible))) currentSettings.ContentColumnColumnVisible = importedSettings.ContentColumnColumnVisible;
+                    if (Has(nameof(DefaultSettings.ContentPathColumnVisible))) currentSettings.ContentPathColumnVisible = importedSettings.ContentPathColumnVisible;
+                    if (Has(nameof(DefaultSettings.FilesSizeColumnVisible))) currentSettings.FilesSizeColumnVisible = importedSettings.FilesSizeColumnVisible;
+                    if (Has(nameof(DefaultSettings.FilesMatchesColumnVisible))) currentSettings.FilesMatchesColumnVisible = importedSettings.FilesMatchesColumnVisible;
+                    if (Has(nameof(DefaultSettings.FilesPathColumnVisible))) currentSettings.FilesPathColumnVisible = importedSettings.FilesPathColumnVisible;
+                    if (Has(nameof(DefaultSettings.FilesExtColumnVisible))) currentSettings.FilesExtColumnVisible = importedSettings.FilesExtColumnVisible;
+                    if (Has(nameof(DefaultSettings.FilesEncodingColumnVisible))) currentSettings.FilesEncodingColumnVisible = importedSettings.FilesEncodingColumnVisible;
+                    if (Has(nameof(DefaultSettings.FilesDateModifiedColumnVisible))) currentSettings.FilesDateModifiedColumnVisible = importedSettings.FilesDateModifiedColumnVisible;
+                    if (Has(nameof(DefaultSettings.ContextPreviewLinesBefore))) currentSettings.ContextPreviewLinesBefore = Math.Clamp(importedSettings.ContextPreviewLinesBefore, 1, 20);
+                    if (Has(nameof(DefaultSettings.ContextPreviewLinesAfter))) currentSettings.ContextPreviewLinesAfter = Math.Clamp(importedSettings.ContextPreviewLinesAfter, 1, 20);
                     
                     // Note: We intentionally do NOT import window position/size
                     // as this is machine-specific and may not work well on other displays
 
                     // AI search settings
-                    currentSettings.AiSearchEndpoint = importedSettings.AiSearchEndpoint?.Trim() ?? string.Empty;
-                    currentSettings.AiSearchApiKey = importedSettings.AiSearchApiKey ?? string.Empty;
-                    currentSettings.AiSearchModel = importedSettings.AiSearchModel?.Trim() ?? string.Empty;
+                    if (Has(nameof(DefaultSettings.AiSearchEndpoint))) currentSettings.AiSearchEndpoint = importedSettings.AiSearchEndpoint?.Trim() ?? string.Empty;
+                    if (Has(nameof(DefaultSettings.AiSearchApiKey))) currentSettings.AiSearchApiKey = importedSettings.AiSearchApiKey ?? string.Empty;
+                    if (Has(nameof(DefaultSettings.AiSearchModel))) currentSettings.AiSearchModel = importedSettings.AiSearchModel?.Trim() ?? string.Empty;
 
                     // Save the merged settings
                     SaveSettings(currentSettings);

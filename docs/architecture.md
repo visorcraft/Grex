@@ -5,185 +5,355 @@ layout: default
 
 # Architecture
 
-This document covers the technical foundation of Grex: the stack, project layout, and the major components that power search, replace, localization, and UI responsiveness.
+Grex is an unpackaged WinUI 3 desktop application plus a Windows console application. Both target .NET 8 and reuse the same search engine.
 
-## Technology Stack
+## Design shape
 
-- **.NET 8** with C# 12
-- **WinUI 3** + Windows App SDK 1.8 for modern Windows desktops
-- **MVVM** for clear separation of UI (Views), state (ViewModels), and logic (Services)
-- **Windows App Runtime** features (toast notifications, Mica backdrop, resource management)
-- **WSL integration** via `wsl.exe` and `grep` for Linux-side searches
-- **Docker.DotNet** for Docker API access (container exec, grep-based searches)
+The application is MVVM-shaped, with a deliberate WinUI code-behind layer:
 
-## Project Structure
+- Models hold result, profile, history, Docker, and preview data.
+- Services own filesystem, process, network, settings, localization, and export behavior.
+- ViewModels own tab state, operations, sorting, filtering, and result collections.
+- XAML defines controls and bindings.
+- Code-behind handles WinUI lifecycle, dynamic menus, dialogs, column sizing, keyboard input, file pickers, AI chat presentation, and other UI-specific orchestration.
 
-```
+`SearchTabContent.xaml.cs` is therefore a UI coordinator, not a passive view. New engine behavior belongs in Services; new tab state belongs in `TabViewModel`; WinUI-only interaction stays in the view.
+
+## Runtime stack
+
+| Layer | Technology |
+| --- | --- |
+| Runtime | .NET 8, C# |
+| GUI | WinUI 3, Windows App SDK 1.8 |
+| Pattern engine | `System.Text.RegularExpressions` |
+| Local files | `System.IO`, async streams, parallel enumeration |
+| Windows Search | `System.Data.OleDb` query adapter |
+| WSL | `wsl.exe`, `find`, `grep`, `git grep`, `sed`, `stat` |
+| Docker direct | Docker.DotNet exec API |
+| Docker fallback | Docker CLI, container/host `tar`, local search |
+| Serialization | `System.Text.Json` |
+| AI | `HttpClient`, OpenAI-compatible JSON |
+| CLI parsing | System.CommandLine |
+| Tests | xUnit, Moq, FluentAssertions |
+
+Direct GUI dependencies are recorded in `Grex.csproj`. The CLI adds System.CommandLine and references the GUI project to reuse services and models.
+
+## Repository map
+
+```text
 Grex/
-├── App.xaml / App.xaml.cs              # Application entry point
-├── MainWindow.xaml / .cs               # Shell + navigation, TabView host
+├── App.xaml(.cs)                    Application startup
+├── MainWindow.xaml(.cs)             Shell, navigation, tabs, themes, shortcuts
 ├── Controls/
-│   ├── SearchTabContent.xaml / .cs     # Search UI per tab
-│   ├── RegexBuilderView.xaml / .cs     # Visual Regex builder
-│   ├── SettingsView.xaml / .cs         # Default preferences UI
-│   └── ResultsTemplateSelector.cs
-├── Models/                             # DTOs for results, suggestions, enums
+│   ├── SearchTabContent.xaml(.cs)   Search UI and WinUI coordination
+│   ├── RegexBuilderView.xaml(.cs)   Interactive Regex sandbox
+│   ├── SettingsView.xaml(.cs)       Settings, import/export, diagnostics
+│   ├── ContextPreviewDialog.*       Match context presentation
+│   ├── AboutView.*                  Version and project information
+│   └── CreditsView.*                Dependency license display
 ├── ViewModels/
-│   ├── MainViewModel.cs                # Tab orchestration
-│   └── TabViewModel.cs                 # Per-tab search state
-├── Services/
-│   ├── SearchService, GitIgnoreService,
-│       RecentPathsService, RecentSearchesService, SearchProfilesService,
-│       SettingsService, LocalizationService,
-│       EncodingDetectionService, DockerSearchService,
-│       AiSearchService, ExportService, AdminHelper, NotificationService, etc.
-├── Grex.Cli/                           # Headless CLI for script integration
-│   ├── Program.cs                      # CLI entry point
-│   ├── Commands/SearchCommand.cs       # System.CommandLine definitions
-│   ├── CliSearchRunner.cs              # Search orchestration
-│   └── Formatters/                     # Output formatters (text/json/csv)
-├── Strings/<culture>/Resources.resw    # Localization dictionaries
-├── Tests/, IntegrationTests/, UITests/ # Unit, integration, and UI test suites
-└── docs/                               # Detailed documentation
+│   ├── MainViewModel.cs             Tab creation and disposal
+│   └── TabViewModel.cs              Per-tab state and operations
+├── Models/                           Result and persistence DTOs
+├── Services/                         Search and platform integrations
+├── Converters/                       XAML value converters
+├── Grex.Cli/                         Console entry point, options, formatters
+├── Strings/<culture>/Resources.resw Localized resource catalogs
+├── Assets/                           Icons and license manifest
+├── Tests/                            Unit tests
+├── Tests/Grex.Cli.Tests/             CLI unit tests
+├── IntegrationTests/                 Filesystem and app integration tests
+├── UITests/                          ViewModel-driven UI tests
+├── Scripts/                          Python maintenance tools
+├── docs/                             Public documentation
+├── build.ps1                         Windows build/package entry point
+├── Grex.iss                          Inno Setup installer definition
+└── .github/workflows/
+    ├── ci.yml                        Push/PR build and test gate
+    └── release.yml                   Tag-triggered release packaging
 ```
 
-## Key Components
+## Core components
+
+### MainWindow
+
+`MainWindow` owns:
+
+- navigation among Search, Regex Builder, Settings, About, and Credits;
+- the tab host;
+- shared status UI;
+- global F1, F5, and Escape behavior;
+- theme resources and Mica setup;
+- localization refresh coordination;
+- window geometry persistence;
+- cancellation and event unsubscription on close.
+
+### MainViewModel
+
+`MainViewModel` creates, selects, closes, and disposes `TabViewModel` instances. It keeps at least one tab available.
+
+### TabViewModel
+
+Each tab contains:
+
+- target and path;
+- query and replacement;
+- search/result modes;
+- all filters and comparison settings;
+- Docker container state;
+- complete and displayed result collections;
+- sort field/direction;
+- result-filter state;
+- status text and stopwatch;
+- operation cancellation;
+- active Docker mirror;
+- disposal logic.
+
+The ViewModel calls `ISearchService` for local/WSL search and replace, and `DockerSearchService` for Docker preparation/direct search.
 
 ### SearchService
 
-- Detects whether a path is Windows, UNC, or WSL.
-- Enumerates files with `EnumerationOptions`, applies filename/directory filters, honors `.gitignore`, and respects binary/link toggles.
-- Streams each file with `StreamReader`, applying Unicode normalization, diacritic stripping, and custom string comparison before matching.
-- Compiles Regex patterns once per search.
-- Shells out to `wsl grep` for Linux paths and parses the output back into `SearchResult` objects.
-- Performs Replace operations, switching results to Files mode so users can see the impact.
+`SearchService` is shared by GUI and CLI. It dispatches between:
+
+- `SearchWindowsPathAsync`;
+- `SearchWslPathAsync`;
+- `ReplaceWindowsPathAsync`;
+- `ReplaceWslPathAsync`.
+
+The local path implementation performs:
+
+1. input and Regex validation;
+2. candidate enumeration or Windows Search seeding;
+3. hidden, system, `.gitignore`, filename, directory, binary, link, and size filtering;
+4. up to eight concurrent file scans;
+5. bounded encoding detection;
+6. line matching or document extraction;
+7. sanitized `SearchResult` creation.
+
+Regex objects are created once per operation without `RegexOptions.Compiled` and with a 10-second timeout.
 
 ### GitIgnoreService
 
-- Parses `.gitignore` files at every directory level, caches the compiled rules, and mirrors Git's matching semantics (negations, directory-only patterns, root-relative patterns, etc.).
-- **Root-relative patterns** - Patterns starting with `/` (e.g., `/storage/app`) only match paths from the repository root, not individual path segments. This prevents `/storage/app` from incorrectly matching files in `/app` directories.
-- **Directory patterns** - Patterns ending with `/` (e.g., `build/` or `/storage/app/`) match files inside those directories. Root-relative directory patterns correctly handle path comparisons by removing the leading `/` when checking directory membership.
-- **Pattern matching** - Converts gitignore patterns to regex with proper escaping, handles wildcards (`*`, `?`, `**`), bracket patterns, and respects case-insensitive matching. Root-relative patterns skip segment-level matching to ensure accurate results.
+`GitIgnoreService`:
 
-### RecentPathsService
+- discovers nested `.gitignore` files from root to candidate;
+- translates common Git ignore syntax into bounded Regex;
+- handles comments, negation, root-relative and directory patterns;
+- caches up to 100 parsed entries;
+- protects its shared cache.
 
-- Stores up to 20 recent paths at `%LocalAppData%\Grex\search_path_history.json`.
-- Provides filtered suggestions to the AutoSuggestBox with add/remove support.
-
-### SettingsService
-
-- Persists all defaults (search type, filters, comparison settings, theme, Windows Search toggle, etc.) plus column visibility and window geometry in `%LocalAppData%\Grex\settings.json`.
-- Saves immediately on change and gracefully recreates defaults if the file is missing/corrupt.
-- Stores AI search configuration: endpoint URL, optional API key, and optional model id.
-- Supports SettingsView endpoint validation flow, where the UI probes `GET /v1/models` using the saved endpoint/API key.
-
-### AiSearchService
-
-- Sends OpenAI-compatible `chat/completions` requests for the AI chat mode in `SearchTabContent`.
-- Builds context-rich prompts using the active path, query, search mode, result mode, and filter suggestions.
-- Supports explicit model selection from Settings or endpoint-driven model discovery via `GET /v1/models`.
-- Falls back to `gpt-4o-mini` if model discovery is unavailable.
-- Normalizes endpoint formats (with/without scheme or `/v1`) and parses different response payload styles (`choices[].message.content`, `choices[].text`, `output_text`).
-
-### LocalizationService
-
-- Wraps WinApp SDK's `ResourceManager` and `.resw` files; supports en-US, es-ES, fr-FR, de-DE out of the box.
-- Validates culture codes, falls back to English when a translation is missing, and notifies the UI whenever the app language changes.
-- Exposes helper methods for formatted strings and caches resource contexts per culture.
+It is a custom implementation, not a call to Git itself. WSL and direct Docker use different adapters.
 
 ### EncodingDetectionService
 
-- Uses BOM, statistical analysis, and heuristics to detect 30+ encodings (Unicode variants, ISO-8859, Windows code pages, Asian/Cyrillic encodings).
-- Converts supported document formats (Office Open XML, OpenDocument, PDF, RTF, ZIP) to text when "Include binary files" is checked.
+`EncodingDetectionService`:
+
+- reads no more than 64 KB;
+- checks byte-order marks;
+- scores available encodings;
+- applies byte-pattern heuristics;
+- falls back to UTF-8;
+- returns the encoding, confidence, BOM state, and reason.
+
+### ContextPreviewService
+
+The preview service detects encoding, seeks toward the requested line, and returns numbered lines plus the match-line index. Reads while seeking are capped at 1 MB.
+
+### WindowsSearchIntegration
+
+The Windows Search adapter queries the OS index for file candidates under a scope. `SearchService` still applies Grex filters and reads candidates to confirm content. A failed index path falls back to enumeration.
 
 ### DockerSearchService
 
-- Manages Docker container search operations with two strategies: direct grep via the Docker API and local mirror fallback.
-- **Docker.DotNet integration** - Uses the `Docker.DotNet` library to execute `grep` directly inside containers via the Docker API, avoiding file copying.
-- **Grep availability caching** - Caches grep availability per container to eliminate redundant checks on subsequent searches.
-- **Parallel grep execution** - Uses `find -print0 | xargs -0 -P 4 grep` for multi-core parallel searching inside containers.
-- **Smart find-level filtering** - Applies system path exclusions (`.git`, `vendor`, `node_modules`, `storage/framework`, `bin`, `obj`), hidden file filters, and binary extension filters at the `find` level before grep runs for maximum performance.
-- **Grep availability check** - Runs `which grep` in the container before attempting the direct search; falls back to mirroring if grep is unavailable.
-- **Mirror management** - Creates temporary local copies of container paths in `%LocalAppData%\Grex\docker-mirrors` when the fallback is needed.
-- **Symlink handling** - Uses `tar --dereference` when mirroring to copy actual file contents, avoiding Windows privilege issues.
-- **Automatic cleanup** - Prunes expired mirrors (older than 6 hours) and cleans up after each search.
-- **Grep output parsing** - Parses `filename:line:content` format into `SearchResult` objects, handling edge cases like colons in content and binary file markers. Correctly counts multiple matches per line and calculates column positions.
+Docker direct flow:
+
+1. Verify `docker version` through the CLI for UI availability.
+2. List running containers with `docker ps`.
+3. Create a Docker.DotNet client for the local daemon.
+4. Exec `which grep`, cached per container.
+5. Exec `sh -c` with `find -exec ... grep`; arguments are shell-quoted and command failures remain visible.
+6. Parse `path:line:content`.
+7. Apply filename and simplified root `.gitignore` post-filters.
+
+Mirror flow:
+
+1. Create a unique host directory.
+2. With symbolic links included, call `docker cp`.
+3. Otherwise create a dereferenced tar under container `/tmp`.
+4. Copy the tar to the host, extract with `tar.exe`, and remove temporary archives best-effort.
+5. Search the mirror with `SearchService`.
+6. Translate local result paths back to container paths.
+7. remove the mirror best-effort.
+
+The service exposes a six-hour stale-pruning helper, but the current app does not call it automatically. Active mirrors are cleaned when targets change, Docker is disabled, or tabs close. Docker replacement is blocked at the ViewModel/UI boundary.
+
+### AiSearchService
+
+`AiSearchService`:
+
+- normalizes endpoint URLs;
+- optionally discovers a first model from Models;
+- builds Chat Completions messages;
+- attaches a bearer key when configured;
+- uses one shared `HttpClient` with a 90-second timeout;
+- accepts several common response content shapes;
+- returns a success/message/error DTO.
+
+The service receives path/query/filter metadata and conversation text from the view. It does not read files or results.
+
+`SearchTabContent` caps both visible AI messages and payload history at 200 per tab.
+
+### Persistence services
+
+| Service | File | Cap |
+| --- | --- | --- |
+| SettingsService | `settings.json` | One settings object |
+| RecentPathsService | `search_path_history.json` | 20 |
+| RecentSearchesService | `search_history.json` | 20 |
+| SearchProfilesService | `search_profiles.json` | 50 |
+
+These services use `System.Text.Json`, process-local locks, and fail-soft reads/writes. Corrupt or inaccessible files generally produce defaults or empty lists.
 
 ### ExportService
 
-- Exports search results to multiple formats: CSV, JSON, and clipboard (tab-separated).
-- Content mode exports include file name, line number, column, content, and paths.
-- Files mode exports include size, match count, extension, encoding, timestamps, and paths.
-- Handles CSV escaping (quotes, commas, newlines) and pretty-printed JSON output.
-- Integrates with Windows file picker for save-to-disk functionality.
+Export builds CSV, JSON, or tab-separated text from the current mode. The view handles file picker and clipboard integration.
 
-### RecentSearchesService
+### LocalizationService
 
-- Tracks up to 20 recent search queries with their paths and filter configurations.
-- Stores searches in `%LocalAppData%\Grex\search_history.json`.
-- Supports add, remove, clear, and filtered retrieval operations.
-- Automatically deduplicates entries, moving repeated searches to the top.
+Localization uses Windows App SDK resource management and `Strings/<culture>/Resources.resw`.
 
-### SearchProfilesService
+The service:
 
-- Stores named "profiles" (path + query + search/filter options) for quick recall.
-- Saves profiles to `%LocalAppData%\Grex\search_profiles.json` and supports add/update/delete operations.
+- tracks current UI culture;
+- provides formatted lookup;
+- falls back when lookup fails;
+- raises change notifications;
+- caches up to 20 resource contexts.
 
-### RegexBuilderView
+`LocalizedToolTipRegistry` retains weak/lifecycle-managed registrations and refreshes tooltips when culture changes.
 
-- Provides dual-pane real-time Regex evaluation: sample text on the left, match output plus visual breakdown on the right.
-- Includes presets (Email, Phone, Date, Digits, URL) and toggles for case-insensitive, multiline, and global matches.
+### LogService
 
-### CLI (Grex.Cli)
+All application diagnostics route to `%Temp%\Grex.log`. Writes are lock-protected. Once the file exceeds roughly 1 MB, the logger keeps the most recent approximately 512 KB at a line boundary.
 
-- **CliSearchRunner** - Orchestrates search execution and output formatting. Maps CLI options to `SearchService.SearchAsync()` parameters and handles exit codes.
-- **SearchCommand** - Defines command-line arguments using System.CommandLine. Supports positional arguments (path, term) and 15+ optional flags matching GUI filters.
-- **Formatters** - Three output formats:
-  - **TextOutputFormatter** - grep-compatible `path:line:column:content` format
-  - **JsonOutputFormatter** - Pretty-printed JSON array with full result metadata
-  - **CsvOutputFormatter** - Header row plus data rows with proper escaping
-- **Exit codes** - 0 (matches found), 1 (no matches), 2 (error)
+## Search flows
 
-### MainWindow & Tab System
+### Local or UNC
 
-- `MainWindow` hosts the SplitView/NavigationView shell, the Search TabView, Regex Builder, Settings, and the shared InfoBar.
-- `MainViewModel` manages tab lifecycles, while `TabViewModel` encapsulates all per-tab search configuration, status text, sorting, and result collections.
+```text
+SearchTabContent
+  -> TabViewModel.PerformSearchAsync
+  -> SearchService.SearchAsync
+  -> Windows candidate enumeration/index
+  -> filters
+  -> parallel scans and extraction
+  -> SearchResult list
+  -> content rows or file aggregation
+  -> result filter and observable collection
+```
 
-## Search Flow
+The ViewModel keeps an unfiltered backing list so Search Within Results can reset without another filesystem scan.
 
-1. User enters a path and query in `SearchTabContent`.
-2. `TabViewModel` validates input.
-3. If Docker mode is active (container selected):
-   - First attempts direct grep search via `DockerSearchService.SearchInContainerAsync()` using the Docker API.
-   - If grep is available, results are returned directly without file copying.
-   - If grep is unavailable, falls back to mirroring the container path locally, then proceeds to step 4.
-4. `TabViewModel` calls `SearchService` with the effective path (local or mirrored).
-5. `SearchService` determines path type, applies filters, leverages Windows Search when allowed, and streams matching lines/files back.
-6. `TabViewModel` populates either `ObservableCollection<SearchResult>` (Content mode) or `ObservableCollection<FileSearchResult>` (Files mode).
-7. The UI updates automatically via data binding; column sort/visibility state stays in sync with saved preferences.
+### WSL
 
-## AI Search Chat Flow
+```text
+SearchService detects WSL path
+  -> extract distribution and Linux path
+  -> build wsl.exe + bash command
+  -> find/grep or git grep
+  -> parse output
+  -> post-filter filename/directories
+  -> normalize result paths
+```
 
-1. User clicks **AI** in the Search command bar.
-2. `SearchTabContent` validates AI endpoint + path + query and switches the lower pane to the chat UI.
-3. `SearchTabContent` builds `AiSearchContext` from active tab state (path/query/mode/filter suggestions).
-4. `AiSearchService` resolves a model (configured model or endpoint discovery) and sends a chat request.
-5. Assistant response is appended to the in-tab conversation, and users can continue with follow-up turns.
+Process cancellation kills the WSL process tree when possible.
 
-## Matching Logic
+### Docker
 
-- **Text searches** - Apply optional Unicode normalization, diacritic stripping (unless diacritic-sensitive), and culture-aware `StringComparison`. Case sensitivity is governed by the global checkbox.
-- **Regex searches** - Only case sensitivity matters (adds/removes `RegexOptions.IgnoreCase`). Other comparison settings are ignored because .NET Regex handles them internally.
-- **Binary/document formats** - Extracted to text first, then fed through the same pipeline as plain text.
-- **WSL paths** - Delegated to `grep` inside WSL; only the case flag translates (`-i`).
+```text
+TabViewModel detects selected container
+  -> DockerSearchService direct grep
+  -> if successful: use parsed results
+  -> if unavailable/failure: create mirror
+  -> SearchService searches local mirror
+  -> ViewModel maps mirror paths to container paths
+```
 
-## Project Notes
+Direct and mirror modes do not have identical filter semantics. The [Feature Matrix](features.md#target-support-matrix) is authoritative for users.
 
-- **File filtering** - Binary formats unsupported by the extractor (images, executables, legacy Office, etc.) are skipped even when "Include binary files" is enabled.
-- **Performance** - Streamed IO, parallel file enumeration (max 8), cached `.gitignore` parsing, and optional Windows Search seeding keep searches responsive.
-- **User data** - Settings, recent paths, notification diagnostics, and logs all live under `%LocalAppData%` or `%Temp%`.
-- **Notifications** - Requires Windows App Runtime 1.8; Grex ships a Test Notification button with detailed diagnostics.
-- **Limitations** - Replace has no undo; max 20 recent paths; 500-character snippet limit per result row.
+## Replace flows
 
-For build pipelines, testing strategy, and asset regeneration instructions, see `docs/build-and-test.md`. For day-to-day workflows, see `docs/usage.md`.
+### Windows and UNC
 
+The local replace pipeline enumerates and filters candidates, then processes up to eight files concurrently:
+
+1. skip files over 100 MB;
+2. detect encoding;
+3. read the full file;
+4. count and replace matches;
+5. overwrite with `File.WriteAllText`;
+6. report a `FileSearchResult`.
+
+There is no transaction or backup.
+
+### WSL
+
+WSL replacement finds matching paths, applies filename/directory filters before writes, counts matches with argument-separated `grep`, applies an escaped `sed -i -E` expression, checks command exit codes, reads metadata with `stat`, and returns file summaries. Replacement text is literal; Regex mode affects the search pattern.
+
+Cancellation stops remaining work but does not roll back completed writes.
+
+## CLI reuse
+
+`Grex.Cli` maps parsed options to `ISearchService.SearchAsync`, then selects:
+
+- quiet exit only;
+- total count;
+- unique full paths;
+- text, JSON, or CSV formatter.
+
+The CLI returns `0`, `1`, or `2` and does not launch WinUI. Its project reference still carries the Windows-targeted Grex assembly and dependencies into build/publish, so the CLI is Windows-only rather than a portable cross-platform console package.
+
+## Threading and cancellation
+
+- Filesystem work uses async APIs where available and bounded `Parallel.ForEachAsync`/`Parallel.ForEach`.
+- UI collections are updated by the ViewModel after background work.
+- Each tab owns and disposes its search cancellation source.
+- The view owns and disposes per-request AI cancellation sources.
+- Process adapters register cancellation to kill child process trees.
+- Closing tabs/windows cancels work and unsubscribes long-lived events.
+- Shared mutable caches use locks or concurrent collections and explicit caps.
+
+## Failure strategy
+
+Grex distinguishes between operation-level and file-level failures:
+
+- invalid path or Regex can fail the operation;
+- inaccessible or unreadable individual files are skipped;
+- Windows Search failure falls back;
+- Docker direct failure falls back to mirror;
+- settings/history read failure returns defaults;
+- logging failure is ignored;
+- cancellation returns the UI to Ready without rollback.
+
+This fail-soft approach keeps search useful on mixed-permission trees, but it means result counts can omit files that could not be processed.
+
+## Tests
+
+The solution contains:
+
+- `Tests/Grex.Tests.csproj`: service, model, ViewModel, control-helper, and license coverage tests;
+- `Tests/Grex.Cli.Tests/Grex.Cli.Tests.csproj`: runner and formatter tests;
+- `IntegrationTests/Grex.IntegrationTests.csproj`: filesystem and app integration;
+- `UITests/Grex.UITests.csproj`: ViewModel-driven UI behavior.
+
+All .NET projects target Windows. Some UI-context integration facts are explicitly skipped.
+
+Python maintenance scripts have `unittest` checks under `Scripts/test_*.py`.
+
+## Packaging and licenses
+
+`build.ps1` restores, builds, tests, publishes self-contained win-x64 GUI/CLI directories, creates ZIP files, and uses Inno Setup when available.
+
+`Grex.iss` installs per user and can add the CLI directory to the current user's `PATH`.
+
+GUI dependency metadata lives in `Assets/third-party-licenses.json`. `Scripts/generate_third_party_notices.py` is the only writer for `THIRD-PARTY-NOTICES.txt`, and `CreditsLicenseCoverageTests` checks resolved GUI packages against the manifest or explicit build-only exclusions.

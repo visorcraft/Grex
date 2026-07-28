@@ -2159,30 +2159,13 @@ namespace Grex.Services
                 files = files.Where(f => !ShouldExcludeDirectory(f, path, excludeDirs));
             }
 
-            // Filter binary files if not included
-            if (!includeBinaryFiles)
+            // Binary/document search uses format-specific readers. Replace has no matching
+            // writer, so rewriting those files as decoded text would corrupt them.
+            files = files.Where(f =>
             {
-                files = files.Where(f =>
-                {
-                    var ext = Path.GetExtension(f);
-                    return string.IsNullOrEmpty(ext) || !BinaryExtensions.Contains(ext);
-                });
-            }
-            else
-            {
-                // When includeBinaryFiles is true, only include files that are either:
-                // 1. Not in BinaryExtensions (normal text files)
-                // 2. In SearchableBinaryExtensions (binary files we can search)
-                files = files.Where(f =>
-                {
-                    var ext = Path.GetExtension(f);
-                    // Include if it's not a binary file (normal text file)
-                    if (string.IsNullOrEmpty(ext) || !BinaryExtensions.Contains(ext))
-                        return true;
-                    // Include if it's a searchable binary file
-                    return SearchableBinaryExtensions.Contains(ext);
-                });
-            }
+                var ext = Path.GetExtension(f);
+                return !BinaryExtensions.Contains(ext) && !SearchableBinaryExtensions.Contains(ext);
+            });
 
             // Filter symbolic links if not included
             if (!includeSymbolicLinks)
@@ -2382,16 +2365,14 @@ namespace Grex.Services
             // For WSL paths, we'll use sed to perform the replacement
             // First, find all files that match, then use sed to replace
             var results = new List<FileSearchResult>();
-            
+
             // Convert Windows path to WSL path and extract distribution
             var wslPath = ConvertToWslPath(path);
             var distro = ExtractWslDistribution(path);
-            var distroArg = !string.IsNullOrEmpty(distro) ? $"-d {distro} " : "";
             var escapedPath = wslPath.Replace("'", "'\"'\"'");
-            
+
             var escapedTerm = searchTerm.Replace("'", "'\"'\"'");
-            var escapedReplace = replaceWith.Replace("'", "'\"'\"'");
-            
+
             // Build find predicates (similar to SearchWslPathAsync)
             var findPredicates = new List<string>
             {
@@ -2408,39 +2389,19 @@ namespace Grex.Services
                 findPredicates.Add("! -name '.*'");
             }
             
-            if (!includeBinaryFiles)
+            // WSL replacement is text-only. Binary/document search has no safe writer.
+            var binaryExts = new[]
             {
-                var binaryExts = new[]
-                {
-                    "exe", "dll", "bin", "zip", "tar", "gz", "7z", "rar",
-                    "png", "jpg", "jpeg", "gif", "bmp", "ico", "svg", "webp",
-                    "mp3", "mp4", "avi", "mkv", "wav", "flac", "ogg",
-                    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-                    "pdb", "cache", "lock", "pack", "idx"
-                };
-                
-                foreach (var ext in binaryExts)
-                {
-                    findPredicates.Add($"! -name '*.{ext}'");
-                }
-            }
-            else
+                "exe", "dll", "bin", "zip", "tar", "gz", "7z", "rar",
+                "png", "jpg", "jpeg", "gif", "bmp", "ico", "svg", "webp",
+                "mp3", "mp4", "avi", "mkv", "wav", "flac", "ogg",
+                "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+                "odt", "ods", "odp", "rtf", "pdb", "cache", "lock", "pack", "idx"
+            };
+
+            foreach (var ext in binaryExts)
             {
-                // When includeBinaryFiles is true, exclude non-searchable binary files
-                // Only include searchable binary files (.docx, .xlsx, .pptx, .odt, .ods, .odp, .zip, .pdf, .rtf)
-                var nonSearchableBinaryExts = new[]
-                {
-                    "exe", "dll", "bin", "tar", "gz", "7z", "rar",
-                    "png", "jpg", "jpeg", "gif", "bmp", "ico", "svg", "webp",
-                    "mp3", "mp4", "avi", "mkv", "wav", "flac", "ogg",
-                    "doc", "xls", "ppt",  // Old Office formats (OLE) - cannot search without libraries
-                    "pdb", "cache", "lock", "pack", "idx"
-                };
-                
-                foreach (var ext in nonSearchableBinaryExts)
-                {
-                    findPredicates.Add($"! -name '*.{ext}'");
-                }
+                findPredicates.Add($"! -name '*.{ext}'");
             }
             
             if (!includeSymbolicLinks)
@@ -2489,48 +2450,31 @@ namespace Grex.Services
 
             var findPreds = string.Join(" ", findPredicates);
             
-            int CountMatches(string targetPath)
+            async Task<int> CountMatchesAsync(string targetPath)
             {
-                try
+                var args = new List<string> { "grep", "-o", "-a" };
+                if (!searchCaseSensitive)
                 {
-                    var grepOptions = new List<string> { "-o", "-a" };
-                    if (!searchCaseSensitive)
-                    {
-                        grepOptions.Add("-i");
-                    }
-                    if (isRegex)
-                    {
-                        grepOptions.Add("-E");
-                    }
-                    
-                    var grepFlags = string.Join(" ", grepOptions);
-                    var countCommand = $"grep {grepFlags} '{escapedTerm}' '{targetPath}' | wc -l";
-                    
-                    var countProcessInfo = new ProcessStartInfo
-                    {
-                        FileName = "wsl",
-                        Arguments = $"{distroArg}bash -c \"{countCommand}\"",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    };
-                    
-                    using var countProcess = Process.Start(countProcessInfo);
-                    if (countProcess == null)
-                    {
-                        return 0;
-                    }
-                    
-                    var countOutput = countProcess.StandardOutput.ReadToEnd();
-                    countProcess.WaitForExit();
-                    
-                    return int.TryParse(countOutput.Trim(), out int matchCount) ? matchCount : 0;
+                    args.Add("-i");
                 }
-                catch
+                args.Add(isRegex ? "-E" : "-F");
+                args.Add("--");
+                args.Add(searchTerm);
+                args.Add(targetPath);
+
+                var result = await RunWslCommandAsync(distro, args, cancellationToken);
+                if (result.ExitCode == 1)
                 {
                     return 0;
                 }
+                if (result.ExitCode != 0)
+                {
+                    throw new IOException($"WSL grep failed: {result.StandardError.Trim()}");
+                }
+
+                return result.StandardOutput.Split(
+                    new[] { '\r', '\n' },
+                    StringSplitOptions.RemoveEmptyEntries).Length;
             }
             
             // First, find files that contain the search term
@@ -2543,18 +2487,22 @@ namespace Grex.Services
             {
                 grepOptions.Add("-E");
             }
+            else
+            {
+                grepOptions.Add("-F");
+            }
             
             var grepFlags = string.Join(" ", grepOptions);
             
             // Find files and check if they contain the search term
-            var findAndGrep = $"find '{escapedPath}' {findPreds} -exec grep {grepFlags} '{escapedTerm}' {{}} + 2>/dev/null || true";
+            var findAndGrep = $"find '{escapedPath}' {findPreds} -exec grep {grepFlags} -- '{escapedTerm}' {{}} +";
             
             if (respectGitignore)
             {
                 // Use git grep -l when in a git repository (much faster and respects .gitignore)
                 // git grep -l returns relative paths, so we prefix with the base path
                 // Fall back to regular find+grep if not in a git repository
-                findAndGrep = $"cd '{escapedPath}' && if [ -d .git ]; then git grep -l {grepFlags} '{escapedTerm}' 2>/dev/null | sed 's|^|{escapedPath}/|' || true; else find '{escapedPath}' {findPreds} -exec grep {grepFlags} '{escapedTerm}' {{}} + 2>/dev/null || true; fi";
+                findAndGrep = $"set -o pipefail; cd '{escapedPath}' && if [ -d .git ]; then git grep -l {grepFlags} -- '{escapedTerm}' | sed 's|^|{escapedPath}/|'; else find '{escapedPath}' {findPreds} -exec grep {grepFlags} -- '{escapedTerm}' {{}} +; fi";
             }
             
             await Task.Run(async () =>
@@ -2562,17 +2510,7 @@ namespace Grex.Services
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var wslArgs = $"{distroArg}bash -c \"{findAndGrep}\"";
-                    
-                    var processInfo = new ProcessStartInfo
-                    {
-                        FileName = "wsl",
-                        Arguments = wslArgs,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    };
+                    var processInfo = CreateWslProcessStartInfo(distro, "bash", "-c", findAndGrep);
                     
                     using var process = Process.Start(processInfo);
                     if (process != null)
@@ -2592,9 +2530,18 @@ namespace Grex.Services
                             }
                         });
 
-                        var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
+                        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+                        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
                         await process.WaitForExitAsync(cancellationToken);
+                        var output = await outputTask;
+                        var error = await errorTask;
                         cancellationToken.ThrowIfCancellationRequested();
+
+                        if (process.ExitCode > 1 ||
+                            (process.ExitCode == 1 && !string.IsNullOrWhiteSpace(error)))
+                        {
+                            throw new IOException($"WSL file discovery failed: {error.Trim()}");
+                        }
                         
                         // Split by both \r\n and \n to handle different line endings
                         var filePaths = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -2609,188 +2556,208 @@ namespace Grex.Services
                                 var trimmedPath = filePath.Trim();
                                 if (string.IsNullOrEmpty(trimmedPath))
                                     continue;
-                                
-                                var matchCount = CountMatches(trimmedPath);
+
+                                var fileName = Path.GetFileName(trimmedPath);
+                                if (!string.IsNullOrWhiteSpace(matchFileNames) &&
+                                    !MatchesFileNamePattern(fileName, matchFileNames))
+                                {
+                                    continue;
+                                }
+                                if (!string.IsNullOrWhiteSpace(excludeDirs) &&
+                                    ShouldExcludeDirectory(trimmedPath, wslPath, excludeDirs))
+                                {
+                                    continue;
+                                }
+
+                                var matchCount = await CountMatchesAsync(trimmedPath);
                                 if (matchCount <= 0)
                                     continue;
-                                
-                                // Use sed to perform the replacement
-                                var sedCommand = isRegex
-                                    ? $"sed -i -E 's/{escapedTerm}/{escapedReplace}/g' '{trimmedPath}'"
-                                    : $"sed -i 's/{escapedTerm}/{escapedReplace}/g' '{trimmedPath}'";
-                                
-                                if (!searchCaseSensitive && !isRegex)
-                                {
-                                    sedCommand = $"sed -i 's/{escapedTerm}/{escapedReplace}/gi' '{trimmedPath}'";
-                                }
-                                
-                                var sedProcessInfo = new ProcessStartInfo
-                                {
-                                    FileName = "wsl",
-                                    Arguments = $"{distroArg}bash -c \"{sedCommand}\"",
-                                    UseShellExecute = false,
-                                    RedirectStandardOutput = true,
-                                    RedirectStandardError = true,
-                                    CreateNoWindow = true
-                                };
-                                
-                                cancellationToken.ThrowIfCancellationRequested();
-                                using var sedProcess = Process.Start(sedProcessInfo);
-                                if (sedProcess != null)
-                                {
-                                    using var sedRegistration = cancellationToken.Register(() =>
-                                    {
-                                        try
-                                        {
-                                            if (!sedProcess.HasExited)
-                                            {
-                                                sedProcess.Kill(entireProcessTree: true);
-                                            }
-                                        }
-                                        catch
-                                        {
-                                            // Ignore errors when killing process
-                                        }
-                                    });
-                                    await sedProcess.WaitForExitAsync(cancellationToken);
-                                    
-                                    long fileSize = 0;
-                                    DateTime dateModified = DateTime.MinValue;
 
-                                    cancellationToken.ThrowIfCancellationRequested();
-                                    var statCommand = $"stat -c '%s %Y' '{trimmedPath}'";
-                                    var statProcessInfo = new ProcessStartInfo
+                                var sedExpression = BuildSedExpression(
+                                    searchTerm,
+                                    replaceWith,
+                                    isRegex,
+                                    searchCaseSensitive);
+                                var sedResult = await RunWslCommandAsync(
+                                    distro,
+                                    new[] { "sed", "-i", "-E", sedExpression, "--", trimmedPath },
+                                    cancellationToken);
+                                if (sedResult.ExitCode != 0)
+                                {
+                                    throw new IOException(
+                                        $"WSL sed failed for '{trimmedPath}': {sedResult.StandardError.Trim()}");
+                                }
+
+                                var statResult = await RunWslCommandAsync(
+                                    distro,
+                                    new[] { "stat", "-c", "%s %Y", "--", trimmedPath },
+                                    cancellationToken);
+                                if (statResult.ExitCode != 0)
+                                {
+                                    throw new IOException(
+                                        $"WSL stat failed for '{trimmedPath}': {statResult.StandardError.Trim()}");
+                                }
+
+                                long fileSize = 0;
+                                DateTime dateModified = DateTime.MinValue;
+                                var statParts = statResult.StandardOutput.Trim()
+                                    .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                                if (statParts.Length >= 2)
+                                {
+                                    long.TryParse(statParts[0], out fileSize);
+                                    if (long.TryParse(statParts[1], out long unixTime))
                                     {
-                                        FileName = "wsl",
-                                        Arguments = $"{distroArg}bash -c \"{statCommand}\"",
-                                        UseShellExecute = false,
-                                        RedirectStandardOutput = true,
-                                        RedirectStandardError = true,
-                                        CreateNoWindow = true
-                                    };
-                                    
-                                    using var statProcess = Process.Start(statProcessInfo);
-                                    if (statProcess != null)
-                                    {
-                                        using var statRegistration = cancellationToken.Register(() =>
-                                        {
-                                            try
-                                            {
-                                                if (!statProcess.HasExited)
-                                                {
-                                                    statProcess.Kill(entireProcessTree: true);
-                                                }
-                                            }
-                                            catch
-                                            {
-                                                // Ignore errors when killing process
-                                            }
-                                        });
-                                        var statOutput = await statProcess.StandardOutput.ReadToEndAsync(cancellationToken);
-                                        await statProcess.WaitForExitAsync(cancellationToken);
-                                        
-                                        var statParts = statOutput.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                                        if (statParts.Length >= 2)
-                                        {
-                                            long.TryParse(statParts[0], out fileSize);
-                                            if (long.TryParse(statParts[1], out long unixTime))
-                                            {
-                                                dateModified = DateTimeOffset
-                                                    .FromUnixTimeSeconds(unixTime)
-                                                    .DateTime;
-                                            }
-                                        }
+                                        dateModified = DateTimeOffset
+                                            .FromUnixTimeSeconds(unixTime)
+                                            .DateTime;
                                     }
-
-                                    var fileName = Path.GetFileName(trimmedPath);
-                                    var relativePath = GetRelativeWslPath(wslPath, trimmedPath);
-                                    
-                                    results.Add(new FileSearchResult
-                                    {
-                                        FileName = fileName,
-                                        Size = fileSize,
-                                        MatchCount = matchCount,
-                                        FullPath = trimmedPath,
-                                        RelativePath = relativePath,
-                                        Extension = Path.GetExtension(fileName),
-                                        Encoding = "UTF-8",
-                                        DateModified = dateModified
-                                    });
                                 }
+
+                                results.Add(new FileSearchResult
+                                {
+                                    FileName = fileName,
+                                    Size = fileSize,
+                                    MatchCount = matchCount,
+                                    FullPath = trimmedPath,
+                                    RelativePath = GetRelativeWslPath(wslPath, trimmedPath),
+                                    Extension = Path.GetExtension(fileName),
+                                    Encoding = "UTF-8",
+                                    DateModified = dateModified
+                                });
                             }
                             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                             {
                                 throw;
                             }
-                            catch
+                            catch (Exception ex)
                             {
-                                // Skip files that can't be processed
+                                throw new IOException(
+                                    $"Failed to replace text in WSL file '{filePath.Trim()}'.",
+                                    ex);
                             }
                         }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("Failed to start wsl.exe.");
                     }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
                     throw;
                 }
-                catch
-                {
-                    // Handle errors
-                }
             }, cancellationToken);
 
-            // Apply filename and directory filters (post-processing for WSL)
-            if (!string.IsNullOrWhiteSpace(matchFileNames))
+            return results;
+        }
+
+        internal static string BuildSedExpression(
+            string searchTerm,
+            string replaceWith,
+            bool isRegex,
+            bool caseSensitive)
+        {
+            if (searchTerm.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0 ||
+                replaceWith.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0)
             {
-                results = results.Where(r => MatchesFileNamePattern(r.FileName, matchFileNames)).ToList();
-            }
-            
-            if (!string.IsNullOrWhiteSpace(excludeDirs))
-            {
-                results = results.Where(r =>
-                {
-                    var relativePath = r.RelativePath;
-                    if (string.IsNullOrEmpty(relativePath))
-                        return true;
-                    
-                    var dirPath = Path.GetDirectoryName(relativePath);
-                    if (string.IsNullOrEmpty(dirPath))
-                        return true;
-                    
-                    var parts = dirPath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
-                    var dirNames = excludeDirs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                    
-                    bool isRegex = excludeDirs.StartsWith("^") || excludeDirs.Contains("(") || excludeDirs.Contains("[") || excludeDirs.Contains("$");
-                    if (isRegex)
-                    {
-                        try
-                        {
-                            var regex = new Regex(excludeDirs, RegexOptions.IgnoreCase, RegexMatchTimeout);
-                            foreach (var part in parts)
-                            {
-                                if (regex.IsMatch(part))
-                                    return false;
-                            }
-                            if (regex.IsMatch(dirPath))
-                                return false;
-                        }
-                        catch
-                        {
-                            // Fall through to comma-separated check
-                        }
-                    }
-                    
-                    foreach (var dirName in dirNames)
-                    {
-                        if (parts.Contains(dirName, StringComparer.OrdinalIgnoreCase))
-                            return false;
-                    }
-                    
-                    return true;
-                }).ToList();
+                throw new ArgumentException("WSL replacement does not support multiline values.");
             }
 
-            return results;
+            const string delimiters = "|#~@%;!,:";
+            var delimiter = delimiters.FirstOrDefault(
+                candidate => !searchTerm.Contains(candidate) && !replaceWith.Contains(candidate));
+            if (delimiter == default)
+            {
+                throw new ArgumentException("WSL replacement contains too many delimiter characters.");
+            }
+
+            var pattern = isRegex ? searchTerm : EscapeExtendedRegexLiteral(searchTerm);
+            var replacement = replaceWith
+                .Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("&", "\\&", StringComparison.Ordinal);
+            var flags = caseSensitive ? "g" : "gi";
+            return $"s{delimiter}{pattern}{delimiter}{replacement}{delimiter}{flags}";
+        }
+
+        private static string EscapeExtendedRegexLiteral(string value)
+        {
+            const string metacharacters = @"\.^$|?*+()[]{}";
+            var escaped = new StringBuilder(value.Length);
+            foreach (var character in value)
+            {
+                if (metacharacters.Contains(character))
+                {
+                    escaped.Append('\\');
+                }
+                escaped.Append(character);
+            }
+            return escaped.ToString();
+        }
+
+        private static ProcessStartInfo CreateWslProcessStartInfo(
+            string? distro,
+            params string[] command)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "wsl",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            if (!string.IsNullOrWhiteSpace(distro))
+            {
+                startInfo.ArgumentList.Add("-d");
+                startInfo.ArgumentList.Add(distro);
+            }
+            foreach (var argument in command)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            return startInfo;
+        }
+
+        private static async Task<(int ExitCode, string StandardOutput, string StandardError)>
+            RunWslCommandAsync(
+                string? distro,
+                IEnumerable<string> command,
+                CancellationToken cancellationToken)
+        {
+            using var process = new Process
+            {
+                StartInfo = CreateWslProcessStartInfo(distro, command.ToArray())
+            };
+            if (!process.Start())
+            {
+                throw new InvalidOperationException("Failed to start wsl.exe.");
+            }
+
+            using var registration = cancellationToken.Register(() =>
+            {
+                try
+                {
+                    if (!process.HasExited)
+                    {
+                        process.Kill(entireProcessTree: true);
+                    }
+                }
+                catch
+                {
+                    // Process may already be gone.
+                }
+            });
+
+            var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+
+            return (
+                process.ExitCode,
+                await outputTask,
+                await errorTask);
         }
 
         private string GetString(string key) =>

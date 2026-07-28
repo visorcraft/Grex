@@ -466,12 +466,12 @@ namespace Grex.Tests.Services
                 excludeDirs: null,
                 searchPath: "/app/src");
 
-            // Now uses sh -c "find ... | xargs ... grep ..." for better performance with parallel execution
+            // Uses find -exec so find and grep failures reach the caller.
             args.Should().HaveCount(3);
             args[0].Should().Be("sh");
             args[1].Should().Be("-c");
             args[2].Should().Contain("find '/app/src'");
-            args[2].Should().Contain("xargs -0 -P 4 -r grep"); // Parallel execution with xargs
+            args[2].Should().Contain("-exec sh -c");
             args[2].Should().Contain("-F"); // Fixed string
             args[2].Should().Contain("-i"); // Case insensitive
             args[2].Should().Contain("'hello'"); // Search term
@@ -518,7 +518,7 @@ namespace Grex.Tests.Services
                 includeSystemFiles: true,
                 includeBinaryFiles: false,
                 includeSymbolicLinks: false,
-                matchFileNames: "*.cs;*.txt",
+                matchFileNames: "*.cs|*.txt",
                 excludeDirs: null,
                 searchPath: "/app");
 
@@ -571,7 +571,7 @@ namespace Grex.Tests.Services
             args[1].Should().Be("-c");
             args[2].Should().Contain("find");
             args[2].Should().Contain("-maxdepth 1");
-            args[2].Should().Contain("xargs -0 -P 4 -r grep"); // Parallel execution with xargs
+            args[2].Should().Contain("-exec sh -c");
         }
 
         [Fact]
@@ -596,8 +596,40 @@ namespace Grex.Tests.Services
             args[0].Should().Be("sh");
             args[1].Should().Be("-c");
             args[2].Should().Contain("find");
-            args[2].Should().Contain("xargs -0 -P 4 -r grep"); // Parallel execution with xargs
+            args[2].Should().Contain("-exec sh -c");
             args[2].Should().NotContain("-maxdepth"); // No depth limit for recursive
+        }
+
+        [Fact]
+        public void BuildGrepCommand_WithBinaryFiles_UsesTextMode()
+        {
+            var args = DockerSearchService.BuildGrepCommand(
+                "test", false, false, true, false, true, true, false, null, null, "/app");
+
+            args[2].Should().Contain("grep -Hn -F -i -a");
+            args[2].Should().NotContain(" -I");
+        }
+
+        [Fact]
+        public void BuildGrepCommand_WithSymbolicLinks_PutsFindOptionBeforePath()
+        {
+            var args = DockerSearchService.BuildGrepCommand(
+                "test", false, false, true, false, true, false, true, null, null, "/app");
+
+            args[2].Should().Contain("find -L '/app'");
+            args[2].Should().NotContain("find '/app' -L");
+        }
+
+        [Fact]
+        public void BuildGrepCommand_ReportsErrorsAndQuotesExcludedDirectories()
+        {
+            var args = DockerSearchService.BuildGrepCommand(
+                "test", false, false, true, false, true, false, false, null,
+                "safe' -exec touch /tmp/pwn ; '", "/app");
+
+            args[2].Should().NotContain("2>/dev/null || true");
+            args[2].Should().Contain("'\"'\"'");
+            args[2].Should().Contain("status=$?");
         }
 
         [Fact]
@@ -872,5 +904,3 @@ namespace Grex.Tests.Services
         }
     }
 }
-
-

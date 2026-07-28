@@ -3,238 +3,332 @@
 
 # Contributing to Grex
 
-Thank you for helping improve Grex. This project is a WinUI 3 / .NET 8
-desktop application with an MVVM core, a scriptable CLI
-(`Grex.Cli`), and a search engine that targets native drives, UNC
-shares, Docker containers, and WSL distributions. Changes should be
-small, tested, and aligned with the existing project boundaries.
+Issues, documentation, translations, tests, and focused code changes are welcome.
+
+Grex is a Windows-only WinUI 3 application with a Windows CLI. Read [Build and Test](docs/build-and-test.md) before starting. The .NET solution cannot be built or tested on Linux or macOS; only Python tools under `Scripts/` are cross-platform.
+
+## Before opening work
+
+- Search [existing issues](https://github.com/visorcraft/Grex/issues).
+- For a bug, include Grex version, Windows build, target type, exact path form, query mode, filters, and reproduction steps.
+- For a feature, explain the user problem and the smallest useful behavior.
+- Do not disclose vulnerabilities publicly. Use [private vulnerability reporting](https://github.com/visorcraft/Grex/security/advisories/new).
+
+Small, single-purpose changes are easier to validate and merge.
 
 ## Contribution workflow
 
-1. Fork the repository on GitHub.
+1. Fork the repository.
 2. Clone your fork:
 
    ```powershell
-   git clone https://github.com/<you>/grex.git
-   cd grex
+   git clone https://github.com/<you>/Grex.git
+   cd Grex
+   git config core.autocrlf false
    ```
 
 3. Create a focused branch:
 
    ```powershell
-   git checkout -b fix-search-filter
+   git switch -c fix-search-filter
    ```
 
-4. Install the development prerequisites from
-   [docs/build-and-test.md](docs/build-and-test.md).
-5. Make the smallest change that fully solves the issue.
-6. Add or update tests and documentation.
-7. Run the local gate:
+4. Restore and build on Windows:
 
    ```powershell
-   dotnet build grex.sln -c Release -p:Platform=x64
-   dotnet test grex.sln -c Release -p:Platform=x64
+   dotnet restore grex.sln
+   dotnet build grex.sln -p:Platform=x64
    ```
 
-8. Push your branch and open a pull request against `master`.
+5. Make the smallest complete change.
+6. Add or update tests and public docs.
+7. Run the appropriate checks.
+8. Push the branch and open a pull request against `master`.
 
-Pull requests should include a clear summary, the tests you ran, and
-screenshots when the change affects the GUI.
+A pull request should state:
 
-## Project layout
+- the problem;
+- the behavior change;
+- tests run;
+- known limitations;
+- screenshots for visible UI changes.
 
-- `Grex.csproj` - the WinUI 3 desktop app (root project).
-- `Grex.Cli/` - the `grex-cli.exe` command-line companion.
-- `Models/` - POCO data types used by both the UI and the engine.
-- `Services/` - search, replace, settings, history, container, WSL,
-  encoding, document-extraction, localization, and journaling logic.
-- `ViewModels/` - observable VMs bound to XAML. No engine logic.
-- `Controls/` - reusable XAML controls.
-- `Converters/` - `IValueConverter` implementations for XAML bindings.
-- `Strings/` - Windows resource files (`.resw`) for 100+ locales.
-- `Tests/` - unit tests (`Grex.Tests`, `Grex.Cli.Tests`).
-- `IntegrationTests/` - integration tests that touch the real
-  filesystem, Docker, or WSL.
-- `UITests/` - ViewModel-driven UI tests.
-- `Scripts/` - Python helpers for localization and version bumping.
-- `docs/` - feature reference, architecture, usage guide, and audits.
+## Repository layout
 
-Keep algorithmic behavior in `Services/`. ViewModels should orchestrate
-service calls and surface state for binding - they should not
-re-implement search, replace, or filtering logic.
+| Path | Purpose |
+| --- | --- |
+| `Grex.csproj` | WinUI 3 GUI project |
+| `Grex.Cli/` | `grex-cli` parser, runner, options, and formatters |
+| `Controls/` | XAML controls and UI-specific code-behind |
+| `ViewModels/` | Tab and shell state/orchestration |
+| `Services/` | Search, replace, platform, persistence, localization, AI, and export logic |
+| `Models/` | Result and persistence DTOs |
+| `Converters/` | WinUI value converters |
+| `Strings/` | 108 `.resw` resource catalogs |
+| `Assets/` | Product artwork and third-party license manifest |
+| `Tests/` | Unit and CLI test projects |
+| `IntegrationTests/` | Filesystem and app integration tests |
+| `UITests/` | ViewModel-driven UI tests |
+| `Scripts/` | Python maintenance tools |
+| `docs/` | Public user and developer documentation |
 
-## Local development
+Read [Architecture](docs/architecture.md) before changing component boundaries.
 
-Use the .NET CLI:
+## Development commands
 
 ```powershell
-dotnet restore
-dotnet build grex.sln -c Debug   -p:Platform=x64   # debug build
-dotnet build grex.sln -c Release -p:Platform=x64   # release build
-dotnet test  grex.sln -c Release -p:Platform=x64   # all tests
-
-# Run the GUI:
-dotnet run --project Grex.csproj -c Debug -p:Platform=x64
-
-# Run a CLI search:
-dotnet run --project Grex.Cli/Grex.Cli.csproj -- "needle" .
+dotnet build grex.sln -c Debug -p:Platform=x64
+dotnet build grex.sln -c Release -p:Platform=x64
+dotnet test grex.sln -c Release -p:Platform=x64
+dotnet run --project Grex.csproj -p:Platform=x64
+dotnet run --project Grex.Cli/Grex.Cli.csproj -p:Platform=x64 -- "C:\repo" "TODO"
 ```
 
-The WinApp SDK requires a concrete `-p:Platform` (x86 / x64 / ARM64).
-"Any CPU" builds will fail.
+Always use a concrete platform. Any CPU fails with WinUI tooling.
 
-## Coding standards
+## Code expectations
 
-- Target .NET 8 with C# 12. Use `nullable` annotations.
-- Follow MVVM strictly: keep search / filesystem / Docker / WSL code in
-  `Services/`, observable state in `ViewModels/`, and bind from XAML.
-- Use `async`/`await` end-to-end for I/O-bound work. Do not block the
-  UI thread.
-- Route all user-facing strings through the localization service -
-  never hard-code English in XAML or C#. New keys must be added to the
-  English `Strings/en-US/Resources.resw` and to every other locale
-  catalog with a placeholder if the translation is not ready.
-- Prefer explicit, focused code over speculative abstraction.
-- Add comments only when the reason is not obvious from the code.
-- Do not hand-edit `.csproj` files for refactors that the IDE can do.
-- Do not add a code-behind override that mutates a ViewModel - go
-  through bindings or expose a command.
-- Do not require nightly tooling. CI runs the public .NET 8 SDK.
+- Follow existing namespace, formatting, and naming patterns.
+- Keep engine and platform work in Services.
+- Keep observable tab state in ViewModels.
+- Keep WinUI-only events, dialogs, pickers, and dynamic menus in view code-behind.
+- Use async/await for I/O.
+- Pass `CancellationToken` through async call chains.
+- Do not block the UI thread.
+- Prefer stateless services where practical.
+- Use existing helpers and dependencies before adding abstractions.
+- Do not add a dependency for a small standard-library task.
+- Route user-facing strings through `LocalizationService`.
+- Update public docs with user-visible behavior.
 
-Every new source file must include the SPDX short header used by the
-repository:
+### Performance and lifecycle rules
 
-```text
-SPDX-FileCopyrightText: 2026 VisorCraft LLC
-SPDX-License-Identifier: GPL-3.0-only
-```
+These rules prevent known hangs and memory growth:
 
-Use the comment syntax appropriate for the file type (`//` for C# and
-`<!-- ... -->` for XAML/XML).
-
-## XAML and UI changes
-
-- Reusable controls live under `Controls/`.
-- New `IValueConverter` types belong in `Converters/`.
-- Theme-aware brushes should follow the existing pattern (Mica
-  backdrop, light/dark variants).
-- Touch UI changes need a screenshot in the PR - both light and dark
-  themes when applicable.
+- Never use `RegexOptions.Compiled` for dynamic or user-supplied patterns.
+- Give dynamic Regex operations an explicit timeout.
+- Cancel and dispose owned `CancellationTokenSource` instances.
+- Unsubscribe handlers that can outlive their subscriber.
+- Store a handler when a lambda must later be removed.
+- Put explicit caps and eviction on caches, histories, buffers, and retained conversations.
+- Bound prefix reads when full content is unnecessary.
+- Protect mutable caches used by parallel search.
+- Dispose processes, streams, HTTP responses, and other handles.
 
 ## Tests
 
-Match test coverage to the risk of the change:
+Match tests to the changed boundary:
 
-- Search, replace, encoding, filtering, and settings changes need unit
-  tests under `Tests/Grex.Tests/`.
-- CLI flag or output changes need integration coverage under
-  `Tests/Grex.Cli.Tests/`.
-- Real-filesystem behavior, Docker exec, or WSL search changes belong
-  in `IntegrationTests/` with `tempfile`-style fixtures.
-- UI behavior changes should add or extend `UITests/`.
+| Change | Test location |
+| --- | --- |
+| Search, replace, filtering, encoding, settings, persistence | `Tests/Grex.Tests.csproj` |
+| CLI parsing, runner, output | `Tests/Grex.Cli.Tests/Grex.Cli.Tests.csproj` |
+| Real filesystem/app integration | `IntegrationTests/Grex.IntegrationTests.csproj` |
+| ViewModel-driven UI behavior | `UITests/Grex.UITests.csproj` |
+| Python maintenance tools | `Scripts/test_*.py` |
 
-The full test gate before opening a pull request:
+Full gate:
 
 ```powershell
 dotnet test grex.sln -c Release -p:Platform=x64
 ```
 
+`.github/workflows/ci.yml` runs the Release x64 build and full solution test gate on pull requests, pushes to `master`, and manual dispatches.
+
+Focused test:
+
+```powershell
+dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~SearchServiceTests"
+```
+
+xUnit 2.9.3 has no `Assert.Skip` or `Assert.SkipUnless`. Return early for a runtime condition or use `Xunit.SkippableFact`. Use static `[Fact(Skip = "...")]` only when the reason is fixed and explicit.
+
+Bug fixes should add one test that fails before the fix and exercises the shared root cause.
+
+## UI changes
+
+- Preserve keyboard access and readable focus states.
+- Localize labels, placeholders, errors, menus, tooltips, and accessibility names.
+- Check narrow and wide window layouts.
+- Check the affected built-in themes.
+- Verify light/dark readability where applicable.
+- Include screenshots for visible changes.
+- Dispose or unregister view-owned resources on unload/close.
+
+Do not invent a new control abstraction for one use.
+
 ## Localization
 
-English (`en-US`) is the source catalog:
+English is the source catalog:
 
 ```text
 Strings/en-US/Resources.resw
 ```
 
-When adding or renaming a resource key:
+To add text:
 
-1. Add the English entry.
-2. Run the locale-sync script to propagate the key to every shipped
-   locale with a placeholder:
+1. Add the English key with `status:complete`.
+2. Propagate it:
 
    ```powershell
-   python Scripts\add_localization_entry.py "ResourceKey" "English text"
+   python Scripts/add_localization_entry.py "KeyName" "English text"
    ```
 
-3. Mark the new entry `status:incomplete` in non-English locales so the
-   translation queue can pick it up.
+3. Review non-English placeholders and statuses.
 
-To remove a key, use `Scripts\remove_localization_entry.py`. The
-translation conventions are documented in
-[docs/translations.md](docs/translations.md).
+To remove text:
+
+```powershell
+python Scripts/remove_localization_entry.py "KeyName"
+```
+
+To inspect current coverage:
+
+```powershell
+python Scripts/generate_translation_status.py
+```
+
+See [Translation and Localization](docs/translations.md) for key patterns, automated translation, tests, and review rules.
+
+### Resource line endings
+
+`.resw` files are CRLF. Python on Linux/macOS emits LF and can rewrite every line.
+
+Verify:
+
+```powershell
+git ls-files --eol Strings/en-US/Resources.resw
+```
+
+Expected index form is `i/crlf`. Convert changed resource files back to CRLF before committing.
+
+## Other line endings
+
+Repository convention:
+
+- `.cs`, `.xaml`, `.csproj`, `.resw`: CRLF
+- `.py`, `.json`, generated `.txt`: LF
+
+Check touched files:
+
+```powershell
+git ls-files --eol <path>
+```
+
+Avoid unrelated whole-file newline changes.
 
 ## Documentation
 
-Update documentation in the same pull request when behavior changes.
+Update the existing source for the behavior:
 
-- User workflows belong in [docs/usage.md](docs/usage.md).
-- Settings, CLI flags, shortcuts, and reference tables belong in
-  [docs/reference.md](docs/reference.md).
-- Architecture or service-boundary changes belong in
-  [docs/architecture.md](docs/architecture.md).
-- New features should be mentioned in [docs/features.md](docs/features.md).
+| Topic | File |
+| --- | --- |
+| Public landing/install overview | `README.md` |
+| User workflow and troubleshooting | `docs/usage.md` |
+| Capability and target matrix | `docs/features.md` |
+| Exact options, schemas, paths, limits | `docs/reference.md` |
+| Components and data flow | `docs/architecture.md` |
+| Build, test, package | `docs/build-and-test.md` |
+| Localization workflow | `docs/translations.md` |
+| Security and privacy | `SECURITY.md` |
 
-## Releasing
+Documentation must describe current code. Do not claim encryption, transactions, rollback, platform support, complete translations, or compatibility that tests/source do not provide.
 
-The product version is declared in several files. Do **not** edit them by
-hand - run the helper, which keeps every location in sync:
+Use relative repository links where possible and verify every local link.
 
-```powershell
-python Scripts\update_version.py 1.2.0
-```
+## Dependencies and licenses
 
-Grex uses 3-part SemVer (`X.Y.Z`). A 2-part value (`1.2`) is accepted and
-normalized to `1.2.0`. The script updates every version location:
+Avoid new dependencies unless they remove more complexity than they add.
 
-- `Directory.Build.props` - `<Version>X.Y.Z</Version>` (solution-wide; drives
-  the CLI's informational version).
-- `Properties/AssemblyInfo.cs` - `AssemblyVersion` / `AssemblyFileVersion`
-  (4-part `X.Y.Z.0`) and `AssemblyInformationalVersion` (`X.Y.Z`).
-- `Package.appxmanifest` - `Version="X.Y.Z.0"` (the MSIX schema requires four
-  parts, so it cannot be 3-part).
-- `app.manifest` - `<assemblyIdentity version="X.Y.Z.0" />`.
-- `Controls/AboutView.xaml.cs` - the hard-coded fallback shown in the About
-  dialog (the live value is read from the assembly at runtime).
+For any GUI NuGet change:
 
-After bumping, commit and tag the release commit (tags are signed):
+1. Check license compatibility with GPL-3.0.
+2. Update `Assets/third-party-licenses.json`.
+3. Regenerate:
 
-```powershell
-git commit -am "Update version to 1.2.0"
-git tag -m "Grex 1.2.0" v1.2.0
-git push && git push origin v1.2.0
-```
+   ```powershell
+   python Scripts/generate_third_party_notices.py
+   ```
 
-Pushing a `v*` tag triggers the release workflow
-(`.github/workflows/release.yml`), which builds, packages, and publishes the
-`win-x64` artifact.
+4. Run:
 
-## Dependency policy
+   ```powershell
+   python Scripts/test_generate_third_party_notices.py
+   dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~CreditsLicenseCoverageTests"
+   ```
 
-Grex is GPL-3.0-only. New NuGet packages must use licenses compatible
-with GPL-3.0 (MIT, Apache-2.0, BSD-*, MS-PL, etc.). If a dependency
-needs license clarification, explain the reason in the pull request.
+Never hand-edit `THIRD-PARTY-NOTICES.txt`.
 
-Avoid new dependencies unless they clearly reduce complexity or
-provide well-tested domain behavior that should not be maintained
-locally.
+Build/test-only packages belong in `KnownBuildOnlyExclusions` in `Tests/Controls/CreditsLicenseCoverageTests.cs`, with a documented reason.
 
-## Pull request expectations
+## Commit and pull request hygiene
 
-A good pull request:
+- Keep commits focused.
+- Do not mix formatting churn with behavior.
+- Do not commit secrets, settings exports, logs, Docker mirrors, build output, or release archives.
+- Use the human committer's authorship only.
+- Do not add AI co-author trailers, generated-by footers, bot attribution, or similar metadata.
+- Explain migrations, compatibility risks, and destructive behavior.
+- Update tests, localization, docs, and third-party notices in the same pull request when required.
 
-- Has one clear purpose.
-- Describes user-visible behavior changes.
-- Calls out migrations or compatibility risks.
-- Includes tests, or explains why tests are not practical.
-- Updates docs and localization when needed.
-- Builds and tests cleanly under `-p:Platform=x64`.
-- Avoids unrelated formatting or refactoring churn.
+## Release process
 
-Maintainers may ask for smaller commits, additional tests, or docs
-updates before merging.
+Maintainers only.
 
-## Security
+1. Start from a clean, current `master`.
+2. Run the full Windows Release build and test gate.
+3. Check vulnerable packages:
 
-Do not report security issues through public issues or pull requests.
-Follow the disclosure policy in [SECURITY.md](SECURITY.md).
+   ```powershell
+   dotnet list package --vulnerable
+   ```
+
+4. Update versions with the script:
+
+   ```powershell
+   python Scripts/update_version.py 1.5.0
+   ```
+
+5. Review synchronized changes in:
+
+   - `Directory.Build.props`
+   - `Properties/AssemblyInfo.cs`
+   - `Package.appxmanifest`
+   - `app.manifest`
+   - `Controls/AboutView.xaml.cs`
+
+6. Commit the version.
+7. Create a signed annotated tag:
+
+   ```powershell
+   git tag -m "Grex 1.5.0" v1.5.0
+   ```
+
+8. Push branch and tag:
+
+   ```powershell
+   git push origin master
+   git push origin v1.5.0
+   ```
+
+9. Confirm `.github/workflows/release.yml` publishes:
+
+   - `grex-<version>-setup.exe`
+   - `grex-<version>-win-x64.zip`
+   - `grex-cli-<version>-win-x64.zip`
+
+The release workflow runs the full solution test command before packaging. Run the same test gate locally before tagging.
+
+## Pull request checklist
+
+- [ ] One clear problem and focused solution
+- [ ] Windows build passes with a concrete platform
+- [ ] Relevant tests pass
+- [ ] Regression test added for non-trivial bug fix
+- [ ] User-facing strings localized
+- [ ] Public docs updated
+- [ ] Security/privacy impact reviewed
+- [ ] Dependency notices updated when needed
+- [ ] Required line endings preserved
+- [ ] UI screenshots included when applicable
+- [ ] No secrets, generated artifacts, or attribution trailers

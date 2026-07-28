@@ -1,178 +1,292 @@
 ---
-title: Feature Deep Dive
+title: Feature Matrix
 layout: default
 ---
 
-# Feature Deep Dive
+# Feature Matrix
 
-This document expands on the high-level feature list in the README and explains everything Grex can do once you start exploring beyond the basics.
+This page states what Grex supports and where behavior changes by target. The [Usage Guide](usage.md) explains workflows; the [Technical Reference](reference.md) defines exact formats and limits.
 
-## Core Search Power
+## Target support matrix
 
-- **Multi-environment paths** - Search Windows drive letters, UNC shares, and WSL paths (`\\wsl$`, `\\wsl.localhost`, `/mnt/...`) from the same tab.
-- **Text or Regex** - Toggle between plain-text comparison and full .NET regular expressions, including multiline and global modes in the Regex Builder.
-- **Case sensitivity everywhere** - One checkbox controls case behavior for text, Regex, and WSL `grep` invocations so results stay consistent.
-- **Parallel pipeline** - Up to eight files are scanned concurrently with streaming IO, so even multi‑gigabyte trees stay responsive.
-- **Smart filters** - Filename pattern matching, directory exclusions, `.gitignore` awareness, binary detection, symbolic link handling, size constraints, and Windows Search index acceleration all stack together.
+| Capability | Windows / UNC | WSL | Docker direct | Docker mirror | CLI |
+| --- | --- | --- | --- | --- | --- |
+| Plain-text search | .NET string comparison | `grep` | `grep -F` | Local .NET engine | Local engine or WSL adapter |
+| Regex search | .NET Regex | `grep -E` | `grep -E` | .NET Regex | Local engine or WSL adapter |
+| Case sensitivity | Yes | `grep -i` when off | `grep -i` when off | Yes | Yes |
+| Culture / Unicode / diacritics | Yes for text search | No | No | Yes | Defaults only; no CLI flags |
+| Recursive search | Yes | Yes | Yes | Yes | Yes |
+| Match Files | `|` wildcards and exclusions | Post-filtered | Post-filtered | Yes | Yes |
+| Exclude Dirs | Names or Regex | Find plus post-filter | Find pruning | Yes | Yes |
+| `.gitignore` | Nested custom parser | `git grep` at Git root | Selected-root file, simplified | Nested custom parser | Same as target adapter |
+| Hidden / system / binary / links | Yes | Adapter-specific | Adapter-specific | Yes | Yes |
+| Size filter | Yes | Yes | No | Yes | Yes |
+| Windows Search index | Plain text only | No | No | No | No flag |
+| Document/archive extraction | Yes | No | No | Yes | Yes for local targets |
+| Context preview | Yes | Yes when path conversion works | No host preview | Mirror path during active search | No |
+| Replace | Direct file write | `sed -i` | No | No | No |
+| Export | CSV, JSON, clipboard | Same GUI output | Same GUI output | Same GUI output | Text, JSON, CSV |
 
-## Docker Container Search
+Docker mode is presented as one target in the UI. The direct and mirror columns explain its two internal strategies.
 
-- **Opt-in setting** - Flip "Enable Docker Search" inside Settings to reveal Docker-aware controls on every tab. Grex remembers this preference for new tabs.
-- **Container picker** - A new dropdown beside the path box defaults to "Local Disk" and lists every running container (with a quick refresh button). Choosing a container tells Grex to treat whatever path you enter as a container path such as `/var/www/html`.
-- **Dual search strategies** - Grex automatically selects the fastest available search method:
-  - **Direct grep (preferred)** - Uses the Docker API to run `grep` directly inside the container with parallel execution (`xargs -P 4`) for blazing-fast searches. Grex checks if `grep` is available in the container before attempting this method.
-  - **Mirror fallback** - If `grep` is not available in the container (e.g., minimal Alpine images without coreutils), Grex falls back to mirroring the container path into `%LocalAppData%\Grex\docker-mirrors` and searching the local copy.
-- **Performance optimizations** - Docker searches use several optimizations:
-  - **Grep availability caching** - Results are cached per container to avoid repeated availability checks.
-  - **Parallel grep execution** - Uses `find -print0 | xargs -0 -P 4 grep` for multi-core parallel searching.
-  - **Smart filtering at find level** - System paths, hidden files, and binary extensions are filtered at the `find` level before grep runs.
-- **Automatic method selection** - The search method is chosen transparently; you'll get results either way without needing to configure anything.
-- **Symbolic link handling** - When the "Include symbolic links" option is unchecked (default), Grex uses `tar --dereference` to copy actual file contents instead of creating symlinks, avoiding Windows privilege issues with directories like `node_modules`.
-- **Safety-first behavior** - Replace mode stays disabled while a container target is selected, Windows Search integration is automatically turned off, and the Browse button is greyed out to avoid mixing host folders with container roots.
-- **Container-aware menus** - Right-clicking a result while in Docker mode shows a simplified menu with Copy Container Path / Copy File Name options that place the translated container path on your clipboard, making it easy to jump back into `docker exec` or your IDE.
+## Search
 
-## Advanced Filters & Size Limits
+### Text matching
 
-- **Match Files** - Include/exclude glob‑style patterns (`*.json|*.txt|-*.log`) for quick scoping.
-- **Exclude Dirs** - Drop unwanted folders via comma-separated names or full Regex.
-- **Respect .gitignore** - Honors nested `.gitignore` files just like Git.
-- **Include System / Hidden / Binary / Symbolic Links** - Opt-in flags control what parts of the filesystem are considered. When "Include system files" is unchecked, Grex automatically excludes: `.git`, `vendor`, `node_modules`, `storage/framework`, `bin`, `obj`, `sys`, `proc`, and `dev` directories.
-- **Size limit with tolerance** - Choose No Limit, Less Than, Equal To, or Greater Than with KB/MB/GB units and automatic tolerances so rounding never hides important files.
-- **Windows Search integration** - Leverage the OS index for instant candidate discovery on indexed Windows folders; Grex seamlessly falls back to the custom file walker elsewhere.
+Local Text Search supports:
 
-## Localization & Accessibility
+- ordinal, current-culture, and invariant-culture comparison;
+- case-sensitive and case-insensitive forms;
+- NFC, NFD, NFKC, and NFKD normalization;
+- optional diacritic removal;
+- a selected comparison culture.
 
-- **100+ built-in languages** - Includes English, Spanish, French, German, Chinese, Japanese, Arabic, Hindi, and many more, with instant UI updates when you switch languages.
-- **Resource-based strings** - Every label, tooltip, placeholder, and status message lives in `.resw` files handled by a resilient `LocalizationService`.
-- **Fallback safety** - Missing translations return the key itself so tests and headless automation never crash.
-- **Automation-friendly tooltips** - All tooltips flow through the localization service and update across Search, Regex Builder, Settings, and About whenever the app language changes.
-- **Easy entry addition** - Use `Scripts/add_localization_entry.py` to add new localization keys to all 100+ language files at once.
+WSL and direct Docker targets delegate matching to the target's `grep`, so only the options mapped to `grep` apply.
 
-## Context Preview
+### Regex matching
 
-- **On-demand context loading** - Press **Space** on any search result to instantly see surrounding lines without leaving your search view.
-- **Configurable context size** - Adjust the number of lines shown before and after the match in Settings → Context Preview (1-20 lines, default 5).
-- **Visual match highlighting** - The matched line is highlighted with a distinct background color and indicator bar, making it easy to spot in the context.
-- **Monospace code display** - Context is displayed in a monospace font with line numbers, preserving code formatting and making it easy to read.
-- **Quick file access** - Click "Open in Editor" in the preview dialog to jump directly to the file at the matched line.
-- **Right-click menu integration** - The "Preview" option is also available in the context menu for mouse-driven workflows.
-- **WSL path support** - Context preview works seamlessly with WSL paths, automatically converting paths as needed.
+Local and mirrored Regex Search uses .NET Regex with a 10-second timeout. Grex intentionally avoids `RegexOptions.Compiled` for user patterns to prevent unbounded process-level cache growth.
 
-## Refined User Experience
+WSL and direct Docker use extended grep expressions. .NET-only constructs may fail or match differently there.
 
-- **Tabbed workflow** - Keep multiple searches open at once, each with its own filters and results.
-- **Navigation pane** - One-click access to Search, Regex Builder, Settings, and About; collapsible for a compact layout.
-- **CommandBar shortcuts** - Search, AI, Replace, Reset, and Filter toggles stay in reach.
-- **Dual result modes** - Content view for per-line hits, Files view for aggregated summaries with size, match counts, encoding, and timestamps.
-- **Column control** - Drag to resize, double-click to auto-fit, right-click to hide/show, with preferences persisted per table.
-- **Responsive layout** - Narrow windows flip the filter stack vertical, and the entire shell follows your theme preference via a dropdown with eleven options: System Default, Light, Dark, and eight high-contrast themes (Black Knight, Paranoid, Diamond, Subspace, Red Velvet, Dreams, Tiefling, Vibes) for enhanced accessibility and visual variety.
-- **Search timing** - The status bar shows exactly how long each search took, formatted intelligently (milliseconds for fast searches, seconds/minutes/hours for longer ones) with proper singular/plural handling.
+### Parallelism and streaming
 
-## Search & Replace Safeguards
+- Local search processes up to eight files concurrently.
+- Normal text files are streamed line by line.
+- Encoding detection reads at most the first 64 KB.
+- Direct Docker search batches files with `find -exec`.
+- Results are accumulated per tab and published to observable collections in batches.
 
-- **Replace workflow** - Enter replacement text, confirm via modal dialog ("Proceed / Cancel"), and watch the Files view highlight every file that will change.
-- **Regex-aware replacements** - Use capture groups in your replace pattern for advanced refactors.
-- **Undo warning** - Operations are permanent; Grex always warns you before touching files.
-- **Stop on demand** - Click the Search or Replace button (which becomes "Stop" during an operation) to immediately cancel a running search or replace. The button reverts once the operation ends, and the other button is disabled to prevent conflicting operations.
+## Paths and environments
 
-## File Intelligence
+### Windows and UNC
 
-- **Encoding detection** - Automatic BOM scanning, heuristics, and statistical analysis for 30+ encodings so matches are accurate even in multi-lingual repositories.
-- **Document parsing** - Optional binary search mode indexes Office Open XML, OpenDocument, PDF, RTF, and ZIP archives by extracting their textual content.
-- **Metadata columns** - Quickly inspect size (human readable), encoding, relative path, and modified timestamps when triaging results.
+Grex accepts drive paths and UNC shares using the current Windows user's permissions. Inaccessible files are skipped.
 
-## Settings & Personalization
+### WSL
 
-- Every toggle on the Settings page becomes the default for new tabs: search type, results mode, filter options, comparison mode, Unicode normalization, diacritic sensitivity, culture, theme, and more.
-- **Default Match Files & Exclude Dirs** - Set default filename patterns and directory exclusions in Settings → Filter Options. New tabs automatically populate with your preferred values (e.g., `*.cs;*.json` for Match Files or `^(.git|node_modules|vendor)$` for Exclude Dirs).
-- **AI endpoint configuration** - Settings → AI Search stores endpoint URL, optional API key, and optional model for AI-assisted search chat.
-- **Endpoint connectivity probe** - The **Test Endpoint** button validates endpoint/auth settings by calling `GET /v1/models` and showing success/failure feedback.
-- Settings live in `%LocalAppData%\Grex\settings.json`, update instantly, and survive rebuilds.
-- Column visibility, window size, and recent paths are all remembered automatically.
+Supported forms include:
 
-### Backup & Restore
-
-- **Export Settings** - Save your current configuration as a timestamped JSON file (`settings_YYYY_MM_DD_H_mm_ss.json`) that you can store anywhere for backup or transfer to another machine.
-- **Import Settings** - Browse for a previously exported backup file; Grex validates the JSON and merges it into your current settings so you don't lose machine-specific preferences like window position.
-- **Restore Defaults** - One click deletes your settings file and restarts the application with factory defaults-useful when troubleshooting or starting fresh.
-
-## Export Results
-
-- **Multiple export formats** - Export search results to CSV, JSON, or copy to clipboard with a single click from the command bar.
-- **Format-appropriate output** - CSV includes proper quoting and escaping, JSON is pretty-printed, clipboard format uses tab-separated values for easy pasting into spreadsheets.
-- **Mode-aware exports** - Content mode exports include file name, line number, column, content, and paths; Files mode exports include size, match count, extension, encoding, and timestamps.
-- **File picker integration** - Save exports directly to disk with timestamped suggested filenames.
-
-## Search Within Results
-
-- **Instant result filtering** - Filter the current results list without re-scanning the filesystem.
-- **Flexible matching** - Content mode matches file name, relative path, and matched text; Files mode matches file name, relative path, extension, and encoding.
-- **Regex support** - Toggle the `.*` button to filter using regular expressions instead of plain text.
-- **Status-aware** - When filtered, the status line switches to "Showing … (filtered from …)"; clear the box to restore the full set.
-
-## AI-Assisted Search Chat
-
-- **Dedicated AI entry point** - The Search command is compact (icon only) and a separate **AI** command starts AI mode.
-- **Chat-first workflow** - In AI mode, result grids and "Search within results" are hidden and replaced with a chat panel.
-- **Rich context handoff** - Grex sends the active search path, search query, search mode, result mode, and filter states as guidance context.
-- **OpenAI-compatible backend** - Endpoint and optional API key are configurable in Settings.
-- **Optional model pinning** - Set a model explicitly, or leave it blank to auto-detect from `/v1/models` (with fallback to `gpt-4o-mini`).
-- **One-click endpoint test** - Run the Settings **Test Endpoint** action to confirm your endpoint + credentials before entering AI chat mode.
-- **Follow-up conversation** - Continue refining the search through additional chat turns without leaving the tab.
-
-## Search History
-
-- **Automatic tracking** - Grex remembers your last 20 search queries along with their paths and filter settings.
-- **Quick recall** - Access recent searches from the search history dropdown to instantly restore a previous query with all its filters.
-- **Smart deduplication** - Duplicate searches are moved to the top rather than creating new entries.
-- **Easy management** - Remove individual entries or clear the entire history from the dropdown menu.
-- **Persistent storage** - Search history survives application restarts, stored in `%LocalAppData%\Grex\search_history.json`.
-
-## Search Profiles
-
-- **Save named profiles** - Store the current tab's path, query, and search/filter options as a reusable profile.
-- **Apply in one click** - Pick a profile from the Profiles menu to instantly populate a tab with those settings.
-- **Safe management** - Overwrite confirmations, per-profile deletion, and an empty-state UI keep things tidy.
-- **Persistent storage** - Profiles are stored in `%LocalAppData%\Grex\search_profiles.json`.
-
-## CLI Mode
-
-- **Headless operation** - Run searches from the command line without launching the GUI, perfect for scripts and automation.
-- **grep-compatible output** - Default text format uses `path:line:column:content` for easy parsing and pipeline integration.
-- **Multiple output formats** - Choose text (default), JSON, or CSV with the `--format` flag.
-- **Full filter support** - All GUI filters available as command-line flags: `--regex`, `--case-sensitive`, `--gitignore`, `--include-hidden`, `--match-files`, `--exclude-dirs`, and more.
-- **Exit codes** - Returns 0 for matches found, 1 for no matches, 2 for errors, enabling use in shell conditionals.
-- **Count and files-only modes** - Use `--count` to output just the match count, or `--files-only` for unique file paths (like `grep -l`).
-- **Quiet mode** - Use `--quiet` for silent operation where only the exit code matters.
-
-### CLI Usage Examples
-
-```bash
-# Basic search
-grex-cli "C:\Projects" "TODO"
-
-# Regex search with JSON output
-grex-cli "C:\src" "TODO|FIXME" --regex --format json
-
-# Respect .gitignore and filter by file type
-grex-cli "C:\repo" "deprecated" --gitignore --match-files "*.cs;*.ts"
-
-# Count matches only
-grex-cli "C:\docs" "error" --count
-
-# Files with matches (like grep -l)
-grex-cli "C:\code" "FIXME" --files-only
-
-# Quiet mode for scripts
-grex-cli "C:\config" "secret" --quiet && echo "Found!" || echo "Not found"
+```text
+\\wsl$\Ubuntu\home\user
+\\wsl.localhost\Ubuntu-24.04\home\user
+/home/user
+/mnt/c/Users/user
 ```
 
-## Productivity Touches
+Grex extracts an explicit distribution from UNC forms. Plain Linux paths use the default WSL distribution.
 
-- **Recent paths AutoSuggest** - Reuse up to 20 prior locations with type-ahead filtering and per-entry removal.
-- **Search history** - Quickly recall recent searches with all their filter settings from the search history dropdown.
-- **Keyboard shortcuts** - Press Enter in the search box to run searches, in the replace box to confirm replacements, and double-click results to open files in the shell.
-- **Admin awareness** - Grex warns when you launch it elevated (toast notifications can't fire in that state) and even tells you how to re-launch unelevated from an admin shell.
+### Docker
 
-Use this document whenever you need the full breadth of features-README keeps the elevator pitch short while this file remains your exhaustive reference.
+Docker search is opt-in. It requires the Docker CLI, a reachable daemon, and a running Linux container.
 
+Direct mode:
+
+- checks for `grep` through the Docker API;
+- executes `find` and `grep` inside the container;
+- caches grep availability for up to 50 containers;
+- reads only the selected root's `.gitignore`;
+- does not apply size limits or document extraction.
+
+Mirror fallback:
+
+- copies the selected container path to `%LocalAppData%\Grex\docker-mirrors`;
+- uses a temporary tar archive in the container when dereferencing links;
+- searches the copy with the local engine;
+- removes the mirror after use when possible;
+- cleans the active mirror when the target changes, Docker is disabled, or the tab closes; crash leftovers require manual deletion.
+
+Browse, Windows Search, and Replace are disabled for a selected container.
+
+## Filters
+
+Grex can combine:
+
+- filename includes and excludes;
+- directory name or Regex exclusions;
+- nested `.gitignore` rules on local paths;
+- recursion;
+- Windows hidden and system attributes;
+- Unix dotfile filtering;
+- known binary-extension filtering;
+- symbolic-link/reparse-point filtering;
+- file-size comparisons;
+- Windows Search candidate seeding.
+
+With **Include system files** off, common dependency, build, VCS, and Linux system directories are excluded. See [System path exclusions](reference.md#system-path-exclusions).
+
+### Size tolerance
+
+Size comparisons deliberately include a tolerance:
+
+- KB: 10 KB
+- MB: 1 MB
+- GB: 25 MB
+
+This affects less-than, equal-to, and greater-than comparisons. Direct Docker search is the exception and ignores size.
+
+## Binary and document search
+
+With **Include binary files** on, the local engine attempts:
+
+- `.docx`, `.xlsx`, `.pptx`;
+- `.odt`, `.ods`, `.odp`;
+- `.zip`;
+- `.pdf` up to 50 MB;
+- `.rtf`.
+
+Behavior is best effort:
+
+- ZIP-based formats search UTF-8 `.xml`, `.txt`, and `.rels` entries.
+- PDF extraction scans raw streams and simple text objects. It is not a complete PDF parser and performs no OCR.
+- RTF extraction strips common control sequences.
+- Encrypted, scanned, compressed, or unusual documents can produce no result.
+- Legacy Office, images, media, executables, and most archives remain excluded.
+
+Binary extraction is for search only. Replace skips known binary, archive, and document formats.
+
+## Results and inspection
+
+### Content results
+
+Content mode shows one row per matching line with filename, line, column, sanitized text, relative path, and per-line match count.
+
+### File results
+
+Files mode groups matches by path and shows size, total matches, extension, encoding, relative path, and modification time.
+
+### Result tools
+
+- sortable and resizable columns;
+- persisted column visibility;
+- in-memory plain-text or Regex filtering;
+- context preview with 1 to 20 surrounding lines;
+- double-click open;
+- Explorer and clipboard context actions;
+- Docker-aware copy actions;
+- CSV, JSON, and clipboard export.
+
+## Replace
+
+Replace is available for Windows, UNC, and WSL targets.
+
+Safeguards:
+
+- explicit Replace mode;
+- non-empty replacement requirement;
+- confirmation dialog;
+- active-operation cancellation;
+- Docker target lockout;
+- local 100 MB per-file cap;
+- Files result summary after writes.
+
+Boundaries:
+
+- no undo, backup, transaction, or journal;
+- Windows/UNC writes are direct;
+- WSL applies file/directory filters before `sed -i -E` and treats replacement text literally;
+- cancellation does not roll back completed files;
+- failures can yield a partial change set;
+- known binary, archive, and document formats are skipped.
+
+Use version control or a backup before replacing.
+
+## Search organization
+
+### Tabs
+
+Each tab retains its own path, query, filter values, results, sorting, and active work.
+
+### Recent paths and searches
+
+- Recent paths: 20
+- Recent searches: 20
+- Duplicate entries move to the top
+- Individual or full-history removal is available
+
+Recent search entries store a practical subset of filters, not every tab property.
+
+### Profiles
+
+Up to 50 named profiles store a fuller path/query/filter snapshot. Profiles support apply, overwrite, and delete. They do not store results, replacement text, or Docker container selection.
+
+## Regex Builder
+
+The Regex Builder offers:
+
+- Email, Phone, Date, Digits, and URL presets;
+- sample text and live matches;
+- case-insensitive, multiline, and global switches;
+- a visual breakdown of literals, groups, classes, anchors, escapes, and quantifiers;
+- overwrite confirmation for an existing pattern.
+
+It does not automatically transfer a pattern to Search.
+
+## AI chat
+
+AI chat supports OpenAI-compatible `GET /v1/models` and `POST /v1/chat/completions` style endpoints.
+
+It provides conversational search guidance from:
+
+- current path and query;
+- Text/Regex and Content/Files modes;
+- filter suggestions;
+- current tab conversation history, capped at 200 messages.
+
+It does not read or send file contents or result rows automatically, execute suggested searches, or modify files.
+
+Model selection can be explicit, first-model discovery, or `gpt-4o-mini` fallback. The HTTP timeout is 90 seconds.
+
+The API key is stored in plain-text settings and included in settings exports. See [Security and Privacy](../SECURITY.md#ai-endpoint-and-api-key).
+
+## Settings and personalization
+
+Grex persists:
+
+- default search and result modes;
+- default Match Files and Exclude Dirs;
+- filter defaults;
+- string-comparison settings;
+- UI language;
+- 12 theme choices;
+- Docker enablement;
+- AI endpoint, key, and model;
+- context-preview line counts;
+- column visibility;
+- window size and position.
+
+Settings export, import, restore, restart, notification test, and localization test actions are available. Import keeps window geometry local and merges every other field present; see [Settings backup and import](reference.md#settings-backup-and-import).
+
+## Localization
+
+The repository ships an English catalog plus 107 non-English resource catalogs. Non-English coverage is incomplete and status varies by locale. Missing entries fall back to English or the resource key.
+
+The UI can refresh language-dependent labels and registered tooltips without a full reinstall. Some changes may require restart.
+
+See the [Translation Guide](translations.md) for the authoritative status script and contribution workflow.
+
+## CLI
+
+`grex-cli` provides:
+
+- positional `<path> <term>` input;
+- text or Regex search;
+- common file filters;
+- text, JSON, and CSV output;
+- count, files-only, and quiet modes;
+- exit codes 0, 1, and 2.
+
+The CLI does not expose Docker search, replacement, Windows Search, or the GUI's advanced comparison settings. See the [CLI reference](reference.md#cli-reference).
+
+## Deliberate non-features
+
+Grex currently has:
+
+- no automatic updater;
+- no telemetry, analytics, or crash uploader implemented by the application;
+- no replace undo;
+- no Docker replace;
+- no OCR;
+- no cross-platform GUI or CLI build;
+- no background filesystem index of its own;
+- no automatic AI file upload.

@@ -334,7 +334,9 @@ public class CliSearchRunnerTests
                 IncludeHidden = true,
                 NoSubfolders = true,
                 MatchFiles = "*.cs",
-                ExcludeDirs = "bin;obj",
+                ExcludeDirs = "bin,obj",
+                SizeLimit = 2,
+                SizeUnit = "MB",
                 Quiet = true
             };
 
@@ -354,10 +356,10 @@ public class CliSearchRunnerTests
                 false, // includeBinaryFiles
                 false, // includeSymbolicLinks
                 SizeLimitType.LessThan, // default SizeLimitType is "less"
-                null,
-                SizeUnit.KB,
+                2,
+                SizeUnit.MB,
                 "*.cs",
-                "bin;obj",
+                "bin,obj",
                 false,
                 StringComparisonMode.Ordinal,
                 UnicodeNormalizationMode.None,

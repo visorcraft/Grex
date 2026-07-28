@@ -408,12 +408,11 @@ namespace Grex.Services
                 grepOptions.Add("-i");
             }
 
-            grepOptions.Add("-s"); // Suppress error messages
-            grepOptions.Add("-I"); // Skip binary files (grep level)
+            grepOptions.Add(includeBinaryFiles ? "-a" : "-I");
 
             var grepFlags = string.Join(" ", grepOptions);
-            var escapedTerm = searchTerm.Replace("'", "'\"'\"'"); // Escape single quotes for shell
-            var escapedPath = searchPath.Replace("'", "'\"'\"'");
+            var quotedTerm = QuoteForPosixShell(searchTerm);
+            var quotedPath = QuoteForPosixShell(searchPath);
 
             // Build find options - apply as many filters at find level for performance
             var findOptions = new List<string>();
@@ -422,12 +421,6 @@ namespace Grex.Services
             if (!includeSubfolders)
             {
                 findOptions.Add("-maxdepth 1");
-            }
-            
-            // Follow symbolic links if requested (must be before other options)
-            if (includeSymbolicLinks)
-            {
-                findOptions.Insert(0, "-L");
             }
             
             findOptions.Add("-type f");
@@ -470,7 +463,7 @@ namespace Grex.Services
                 }
             }
             
-            // Exclude directories at find level using -prune (much faster than post-processing)
+            // Exclude directories at find level.
             if (!string.IsNullOrWhiteSpace(excludeDirs) && includeSubfolders)
             {
                 var pruneCommands = BuildExcludeDirsFindOptions(excludeDirs);
@@ -482,10 +475,11 @@ namespace Grex.Services
 
             var findOpts = string.Join(" ", findOptions);
             
-            // Use xargs with parallel execution (-P 4) for faster searching
-            // -print0 and -0 handle filenames with spaces/special characters safely
-            // -r prevents xargs from running grep when no files are found
-            var shellCmd = $"find '{escapedPath}' {findOpts} -print0 2>/dev/null | xargs -0 -P 4 -r grep {grepFlags} -- '{escapedTerm}' 2>/dev/null || true";
+            // Keep the pattern and filenames as arguments, not shell source. grep exit 1 means
+            // no match; real errors remain non-zero so the caller can fall back to mirroring.
+            var findCommand = includeSymbolicLinks ? "find -L" : "find";
+            var grepCommand = $"pattern=$1; shift; grep {grepFlags} -- \"$pattern\" \"$@\"; status=$?; [ \"$status\" -le 1 ]";
+            var shellCmd = $"{findCommand} {quotedPath} {findOpts} -exec sh -c {QuoteForPosixShell(grepCommand)} sh {quotedTerm} {{}} +";
             
             return new[] { "sh", "-c", shellCmd };
         }
@@ -520,7 +514,7 @@ namespace Grex.Services
                         var cleanDir = dir.Trim();
                         if (!string.IsNullOrEmpty(cleanDir))
                         {
-                            options.Add($"! -path '*/{cleanDir}/*'");
+                            options.Add("! -path " + QuoteForPosixShell($"*/{cleanDir}/*"));
                         }
                     }
                 }
@@ -531,11 +525,16 @@ namespace Grex.Services
                 var dirs = excludeDirs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 foreach (var dir in dirs)
                 {
-                    options.Add($"! -path '*/{dir}/*'");
+                    options.Add("! -path " + QuoteForPosixShell($"*/{dir}/*"));
                 }
             }
 
             return string.Join(" ", options);
+        }
+
+        internal static string QuoteForPosixShell(string value)
+        {
+            return "'" + value.Replace("'", "'\"'\"'") + "'";
         }
 
         /// <summary>

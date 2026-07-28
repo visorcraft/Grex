@@ -5,33 +5,263 @@ layout: default
 
 # Technical Reference
 
-This document provides detailed technical specifications for power users and developers who need precise information about Grex's behavior, file formats, and configuration.
+This is the precise reference for Grex's UI commands, patterns, files, settings, outputs, and limits. See [Usage](usage.md) for guided workflows and [Architecture](architecture.md) for implementation flow.
 
-## Keyboard Shortcuts
+## Keyboard and pointer commands
 
-| Shortcut | Action |
-|----------|--------|
-| **Enter** | Execute search (when focus is in search text box) |
-| **Enter** | Execute replace (when focus is in "Replace with" text box) |
-| **Space** | Open context preview for selected search result (Content mode) |
-| **Escape** | Close context preview dialog |
-| **F1** | Open the About page (available from anywhere in the application) |
-| **Double-Click** | Open file from search results (opens in default application) |
+| Input | Context | Action |
+| --- | --- | --- |
+| Enter | Search query | Run Search; in AI mode, begin a new discussion |
+| Enter | Replace text | Run Replace when enabled |
+| Enter | AI follow-up | Send the message |
+| F5 | Active Search tab | Run Search; if Search is active, invoke its Stop behavior |
+| Escape | Active operation | Cancel Search or Replace |
+| Escape | Idle Search tab | Clear search and replacement inputs |
+| F1 | Anywhere in the main window | Open About |
+| Space | Selected Content result | Open context preview |
+| Double-click | Content or Files result | Open the file with the default application |
+| Right-click | Result | Open file, preview, Explorer, or copy actions appropriate to the target |
+| Right-click | Column header | Show or hide optional columns |
+| Double-click | Column divider | Auto-fit that column |
 
-## Context Menu Options (Content Mode)
+## Path forms
 
-Right-click any search result in Content mode to access these options:
+| Target | Form | Example |
+| --- | --- | --- |
+| Windows | Drive path | `C:\source\Grex` |
+| UNC | Share path | `\\server\share\logs` |
+| WSL explicit | Legacy UNC | `\\wsl$\Ubuntu\home\user` |
+| WSL explicit | Current UNC | `\\wsl.localhost\Ubuntu-24.04\home\user` |
+| WSL default distro | Linux path | `/home/user` |
+| WSL default distro | Mounted Windows path | `/mnt/c/Users/user` |
+| Docker | Container path | `/app/src` |
 
-| Option | Description |
-|--------|-------------|
-| **Preview (Space)** | Opens context preview dialog showing surrounding lines |
-| **Show in Explorer** | Opens Windows Explorer with the file selected |
-| **Copy Path** | Copies the full file path to clipboard |
-| **Copy File Name** | Copies just the file name to clipboard |
+The CLI validates `Directory.Exists` before invoking the search service. Use WSL UNC paths with the CLI; a raw `/home/...` path is not a Windows directory and fails CLI validation.
 
-## Settings File Structure
+## Match Files syntax
 
-Grex stores settings in `%LocalAppData%\Grex\settings.json`. Here's the complete structure:
+Match Files compares only the filename, case-insensitively.
+
+| Syntax | Meaning |
+| --- | --- |
+| `*` | Any number of characters |
+| `?` | One character |
+| `|` | Alternative separator |
+| leading `-` | Exclude an alternative |
+
+Examples:
+
+| Pattern | Result |
+| --- | --- |
+| `*.cs` | Include C# files |
+| `*.cs|*.xaml` | Include C# or XAML files |
+| `*.json|-*.generated.json` | Include JSON except generated JSON |
+| `-*.log` | Include everything except `.log` files |
+
+Use `|`, not semicolons.
+
+## Exclude Dirs syntax
+
+Exclude Dirs supports:
+
+1. comma-separated directory names, such as `.git,node_modules,vendor`;
+2. a case-insensitive Regex matched against each path component and the relative directory path.
+
+Use an anchored expression to make Regex intent explicit:
+
+```regex
+^(.git|node_modules|vendor)$
+```
+
+The UI rejects obviously invalid Regex-like input. The local engine falls back to comma-name handling if Regex construction fails.
+
+## `.gitignore` behavior
+
+Local Windows and mirror searches use `GitIgnoreService`, which supports:
+
+- comments and blank lines;
+- negation;
+- root-relative patterns;
+- directory-only patterns;
+- `*`, `?`, `**`, and bracket patterns;
+- nested `.gitignore` files.
+
+The parser caches at most 100 entries and evicts half when over capacity. Ignore-rule Regex operations use a 5-second timeout.
+
+Target differences:
+
+- WSL at a Git root uses `git grep`, which searches files visible to Git. Otherwise WSL uses normal `find`/`grep`.
+- Direct Docker reads only `<search-root>/.gitignore`, uses simplified wildcard matching, and ignores negation.
+- Docker mirror fallback uses the local parser on the copied tree.
+
+## System path exclusions
+
+When **Include system files** is off, local search excludes Windows `System` attributes and any path component or path pair below:
+
+| Exclusion | Scope |
+| --- | --- |
+| `.git` | VCS metadata |
+| `vendor` | Common dependency directory |
+| `node_modules` | Node dependencies |
+| `storage/framework` | Laravel generated state |
+| `bin` | Build output |
+| `obj` | Build intermediates |
+| `sys` | WSL/Docker system tree |
+| `proc` | WSL/Docker process tree |
+| `dev` | WSL/Docker device tree |
+
+Hidden filtering is separate. With **Include hidden items** off, Grex skips the Windows `Hidden` attribute and dot-prefixed files or directory components.
+
+## Size filter tolerances
+
+| Unit | Tolerance |
+| --- | --- |
+| KB | 10 KB |
+| MB | 1 MB |
+| GB | 25 MB |
+
+The local engine applies:
+
+- Less Than: `size < limit + tolerance`
+- Equal To: `abs(size - limit) <= tolerance`
+- Greater Than: `size > limit - tolerance`
+
+WSL maps size to `find -size`, whose boundary behavior can differ. Direct Docker search does not apply size.
+
+The CLI passes the numeric size and selected unit directly to the search service. For example, `--size-limit 2 --size-unit MB` means 2 MB.
+
+## Text comparison
+
+### StringComparisonMode
+
+| JSON value | Mode |
+| --- | --- |
+| `0` | Ordinal |
+| `1` | CurrentCulture |
+| `2` | InvariantCulture |
+
+Case sensitivity selects the matching sensitive/insensitive form.
+
+### UnicodeNormalizationMode
+
+| JSON value | Mode |
+| --- | --- |
+| `0` | None |
+| `1` | NFC / Form C |
+| `2` | NFD / Form D |
+| `3` | NFKC / Form KC |
+| `4` | NFKD / Form KD |
+
+When diacritic sensitivity is off, Grex decomposes text and removes non-spacing marks before comparison.
+
+These settings affect local plain-text matching. Regex, WSL grep, and direct Docker grep do not use the full comparison pipeline.
+
+## Regex behavior
+
+| Operation | Engine | Timeout |
+| --- | --- | --- |
+| Local search and replace | .NET Regex | 10 seconds per match operation |
+| Local wildcard conversion | .NET Regex | 10 seconds |
+| `.gitignore` parser | .NET Regex | 5 seconds |
+| Docker result parsing/filter helpers | .NET Regex | 5 seconds |
+| Result filter | .NET Regex | 2 seconds |
+| Exclude Dirs UI validation | .NET Regex | 2 seconds |
+| WSL / direct Docker search | target `grep -E` | target-defined |
+| WSL replacement | target `sed -E` | target-defined |
+
+User-supplied .NET patterns use `RegexOptions.None` plus optional `IgnoreCase`, never `RegexOptions.Compiled`.
+
+An invalid search Regex reports an error. An invalid result-filter Regex displays all current results until valid.
+
+## Searchable documents and binary formats
+
+The local extractor recognizes:
+
+| Format | Extensions | Method |
+| --- | --- | --- |
+| Office Open XML | `.docx`, `.xlsx`, `.pptx` | Search `.xml`, `.txt`, and `.rels` ZIP entries |
+| OpenDocument | `.odt`, `.ods`, `.odp` | Search `.xml`, `.txt`, and `.rels` ZIP entries |
+| ZIP | `.zip` | Search selected textual entries |
+| PDF | `.pdf` | Best-effort raw stream and text-object scan, maximum 50 MB |
+| Rich Text | `.rtf` | Strip common RTF controls and search readable text |
+
+This is not OCR or full document parsing. Password-protected, scanned, heavily compressed, or unusual documents may not match.
+
+Known binary extensions that remain excluded include legacy Office (`.doc`, `.xls`, `.ppt`), images, media, executables, libraries, and most archive types.
+
+Replacement does not reconstruct these formats. Replace skips known binary, archive, and document extensions even when binary search is enabled.
+
+## Encoding detection
+
+Encoding detection reads at most 65,536 bytes and uses:
+
+1. BOM detection;
+2. candidate decoding and statistical scoring;
+3. Shift-JIS, Chinese, Korean, and Cyrillic-oriented heuristics;
+4. UTF-8 fallback.
+
+Built-in Unicode candidates are UTF-8, UTF-16 LE/BE, and UTF-32 LE. The service also attempts to load UTF-32 BE, ISO-8859 variants, Windows-125x, Shift-JIS, GB2312/GBK, Big5, EUC-KR, and KOI8-R/U. Availability depends on the encoding providers registered by the runtime.
+
+WSL and direct Docker results report UTF-8-oriented content rather than running the full local detector.
+
+## Results
+
+### Content row
+
+| Field | Meaning |
+| --- | --- |
+| FileName | Basename, or archive plus entry name |
+| LineNumber | 1-based source/extracted line |
+| ColumnNumber | 1-based first-match column |
+| LineContent | Sanitized matching line |
+| MatchCount | Occurrences on this line |
+| FullPath | Host, WSL, or container path |
+| RelativePath | Path relative to the search root |
+| MatchPreviewBefore/Match/After | Tooltip segments centered near the first match |
+
+Match previews are capped at 400 characters. Extracted archive/PDF display lines are capped at 500 characters plus an ellipsis.
+
+### Files row
+
+| Field | Meaning |
+| --- | --- |
+| FileName | Basename |
+| Size | Bytes |
+| MatchCount | Sum across matching lines |
+| FirstMatchLineNumber | First match when known |
+| PreviewMatches | First few line previews |
+| FullPath / RelativePath | Absolute and root-relative paths |
+| Extension | File extension |
+| Encoding | Detected encoding label |
+| DateModified | Last modification time |
+
+## Result export
+
+GUI export uses the currently displayed result mode and filter:
+
+- Content CSV/JSON/clipboard: name, line, column, content, relative path, full path, and match count
+- Files CSV/JSON/clipboard: name, size, match count, relative path, full path, extension, encoding, and modified time
+
+Clipboard output is tab-separated.
+
+## User data and files
+
+| Data | Path | Retention |
+| --- | --- | --- |
+| Settings | `%LocalAppData%\Grex\settings.json` | Until reset/manual deletion |
+| Recent paths | `%LocalAppData%\Grex\search_path_history.json` | 20 |
+| Search history | `%LocalAppData%\Grex\search_history.json` | 20 |
+| Search profiles | `%LocalAppData%\Grex\search_profiles.json` | 50 |
+| Docker mirrors | `%LocalAppData%\Grex\docker-mirrors\` | Active cleanup; crash leftovers require manual deletion |
+| Application log | `%Temp%\Grex.log` | About 1 MB cap, then trimmed near 512 KB |
+| Notification test log | `%LocalAppData%\Grex\notification_test.log` | Diagnostic test output |
+| Installed app | `%LocalAppData%\Programs\Grex` | Installer default |
+
+No search index or result database is persisted by Grex.
+
+## Settings schema
+
+`%LocalAppData%\Grex\settings.json` is a JSON serialization of `DefaultSettings`. Enum values are numeric.
 
 ```json
 {
@@ -76,347 +306,271 @@ Grex stores settings in `%LocalAppData%\Grex\settings.json`. Here's the complete
 }
 ```
 
-### Enum Values
+`Culture` defaults to the current machine culture, so it may differ from this example. Preview line values are clamped to 1 through 20 when read or written.
 
-**ThemePreference:**
-| Value | Theme |
-|-------|-------|
-| 0 | System Default |
-| 1 | Light Mode |
-| 2 | Dark Mode |
-| 3 | Gentle Gecko (High Contrast) |
-| 4 | Black Knight (High Contrast) |
-| 5 | Diamond (High Contrast) |
-| 6 | Dreams (High Contrast) |
-| 7 | Paranoid (High Contrast) |
-| 8 | Red Velvet (High Contrast) |
-| 9 | Subspace (High Contrast) |
-| 10 | Tiefling (High Contrast) |
-| 11 | Vibes (High Contrast) |
+### SizeUnit
 
-**SizeUnit:**
 | Value | Unit |
-|-------|------|
-| 0 | KB (Kilobytes) |
-| 1 | MB (Megabytes) |
-| 2 | GB (Gigabytes) |
+| --- | --- |
+| `0` | KB |
+| `1` | MB |
+| `2` | GB |
 
-**StringComparisonMode:**
-| Value | Mode |
-|-------|------|
-| 0 | Ordinal |
-| 1 | CurrentCulture |
-| 2 | InvariantCulture |
+### ThemePreference
 
-## AI Search Request Context
+| Value | Theme |
+| --- | --- |
+| `0` | System |
+| `1` | Light |
+| `2` | Dark |
+| `3` | Gentle Gecko |
+| `4` | Black Knight |
+| `5` | Diamond |
+| `6` | Dreams |
+| `7` | Paranoid |
+| `8` | Red Velvet |
+| `9` | Subspace |
+| `10` | Tiefling |
+| `11` | Vibes |
 
-When AI mode is enabled from the Search command bar, Grex sends an OpenAI-compatible chat request with:
+### Settings write behavior
 
-- Two system messages:
-  - AI assistant behavior instructions.
-  - Search context details (path, query, search type, results mode, and filter suggestions).
-- The current conversation turns (user + assistant) for follow-up refinement.
+- Settings are cached in process and saved immediately after most changes.
+- Missing or unreadable JSON returns defaults.
+- Save failures are ignored by the service.
+- Restore Defaults deletes only `settings.json`.
+- The AI API key is plain text.
 
-Model selection behavior:
+## Settings backup and import
 
-- If **Settings → AI Search → Model** is set, Grex uses that exact model id.
-- If model is blank, Grex requests `GET /v1/models` on the configured endpoint and uses the first returned model id.
-- If discovery fails, Grex falls back to `gpt-4o-mini`.
+Export serializes all `DefaultSettings` fields, including:
 
-### AI Endpoint Test Button Behavior
+- window position and size;
+- AI endpoint;
+- AI API key;
+- AI model.
 
-Settings → AI Search includes a **Test Endpoint** button that validates connectivity before you start chat:
+Treat exported JSON as a secret when it contains a key.
 
-- Builds a models URL from your configured endpoint (`<base>/v1/models`, or `<base>/models` if already specified).
-- Sends `GET /v1/models` with `Authorization: Bearer <apiKey>` when an API key is present.
-- Reports success with the first returned model id (or "(no model id returned)" if absent).
-- Reports endpoint errors by preferring structured API messages (`error.message`) and falling back to HTTP reason text.
+Import validates JSON and merges only fields present in the imported object. It applies every exported non-window field, including Docker enablement, default Match Files/Exclude Dirs, context-preview counts, and AI settings. Unknown fields are ignored. Invalid enum values are rejected. Window position and size remain machine-local and are never imported.
 
-## Search Profiles File Structure
+## Search history schema
 
-Grex stores saved search profiles in `%LocalAppData%\Grex\search_profiles.json` as a JSON array. Each entry is a snapshot of the tab's search settings at the time the profile was saved.
+Each entry in `search_history.json` contains:
 
-Example:
+- `SearchTerm`, `SearchPath`;
+- `MatchFileNames`, `ExcludeDirs`;
+- `IsRegexSearch`, `IsFilesSearch`;
+- `SearchCaseSensitive`, `RespectGitignore`;
+- `IncludeSubfolders`, `IncludeHiddenItems`, `IncludeBinaryFiles`;
+- `Timestamp`, `ResultCount`.
+
+The deduplication key uses term, path, search/result modes, case sensitivity, Match Files, and Exclude Dirs.
+
+## Search profile schema
+
+Each profile contains:
+
+- name, path, and term;
+- search and result modes;
+- `.gitignore`, case, system, recursion, hidden, binary, link, and Windows Search flags;
+- Match Files and Exclude Dirs;
+- size type, value, and unit;
+- string comparison, normalization, diacritic, and culture values;
+- created and updated timestamps.
+
+Profiles do not contain result rows, replacement text, or a Docker container id.
+
+## AI protocol
+
+### Endpoint construction
+
+| Configured endpoint | Chat URL | Models URL |
+| --- | --- | --- |
+| `https://host/v1` | `https://host/v1/chat/completions` | `https://host/v1/models` |
+| `https://host` | `https://host/v1/chat/completions` | `https://host/v1/models` |
+| exact `.../chat/completions` | unchanged for chat | base normalization may not suit model discovery |
+| exact `.../models` | base normalization may not suit chat | unchanged for models |
+
+Grex prepends `https://` when the scheme is missing and trims trailing slashes. It also accepts an explicit `http://` URL, but HTTPS is strongly recommended.
+
+### Request
+
+The chat request contains:
 
 ```json
-[
-  {
-    "Name": "My Project",
-    "SearchPath": "C:\\Projects\\MyApp",
-    "SearchTerm": "TODO",
-    "IsRegexSearch": false,
-    "IsFilesSearch": false,
-    "RespectGitignore": true,
-    "SearchCaseSensitive": false,
-    "IncludeSystemFiles": false,
-    "IncludeSubfolders": true,
-    "IncludeHiddenItems": false,
-    "IncludeBinaryFiles": false,
-    "IncludeSymbolicLinks": false,
-    "UseWindowsSearchIndex": false,
-    "MatchFileNames": "*.cs;*.md",
-    "ExcludeDirs": "bin,obj",
-    "SizeLimitType": 0,
-    "SizeLimitKB": null,
-    "SizeUnit": 0,
-    "StringComparisonMode": 0,
-    "UnicodeNormalizationMode": 0,
-    "DiacriticSensitive": true,
-    "Culture": "en-US",
-    "CreatedAt": "2026-01-20T10:00:00",
-    "UpdatedAt": "2026-01-20T10:00:00"
-  }
-]
+{
+  "model": "configured-or-resolved-id",
+  "temperature": 0.2,
+  "messages": [
+    { "role": "system", "content": "Grex assistant instructions" },
+    { "role": "system", "content": "Path, query, modes, and filter suggestions" },
+    { "role": "user", "content": "Conversation..." }
+  ]
+}
 ```
 
-## Size Limit Tolerances
+An `Authorization: Bearer <key>` header is added only when the key is non-empty.
 
-When filtering files by size, Grex applies tolerance ranges to handle rounding:
+### Model selection
 
-| Unit | Tolerance | Example |
-|------|-----------|---------|
-| KB | ±10 KB | "Equal To 100 KB" matches 90-110 KB |
-| MB | ±1 MB | "Equal To 10 MB" matches 9-11 MB |
-| GB | ±25 MB | "Equal To 1 GB" matches ~975 MB-1025 MB |
+1. Use a configured non-empty model exactly.
+2. Otherwise request the first `data[].id` from Models.
+3. Fall back to `gpt-4o-mini`.
 
-Tolerances apply to all operations: "Less Than" allows files up to (limit + tolerance), "Greater Than" allows files down to (limit - tolerance).
+The resolved model is cached until the normalized endpoint changes.
 
-## Supported Binary File Formats
+### Response parsing
 
-When "Include binary files" is enabled, Grex can search text content within these formats:
+Grex accepts:
 
-### Supported Formats
+- `choices[0].message.content` as a string or content-part array;
+- `choices[0].text`;
+- top-level `output_text`.
 
-| Format | Extensions | Method |
-|--------|------------|--------|
-| Office Open XML | `.docx`, `.xlsx`, `.pptx` | Extracts XML content from ZIP archive |
-| OpenDocument | `.odt`, `.ods`, `.odp` | Extracts XML content from ZIP archive |
-| ZIP Archives | `.zip` | Searches file names and XML/text content |
-| PDF Documents | `.pdf` | Extracts text from PDF streams |
-| Rich Text Format | `.rtf` | Removes RTF control codes, searches text |
+Structured `error.message` is preferred for failures. HTTP requests use a shared client with a 90-second timeout.
 
-### Unsupported Formats
+## CLI reference
 
-These binary types cannot be searched (excluded even with "Include binary files" enabled):
+### Syntax
 
-- **Legacy Office**: `.doc`, `.xls`, `.ppt` (OLE compound format)
-- **Images**: `.png`, `.jpg`, `.jpeg`, `.gif`, `.bmp`, `.ico`, `.svg`, `.webp`
-- **Media**: `.mp3`, `.mp4`, `.avi`, `.mkv`, `.wav`, `.flac`, `.ogg`
-- **Executables**: `.exe`, `.dll`, `.bin`
-- **Archives**: `.tar`, `.gz`, `.7z`, `.rar`
-- **Other binary**: `.pdb`, `.cache`, `.lock`, `.pack`, `.idx`
-
-## Encoding Detection
-
-Grex's encoding detection service supports 30+ encodings using multiple detection methods:
-
-### Detection Methods
-
-1. **BOM Detection** (95% confidence when present)
-   - UTF-8, UTF-16 LE/BE, UTF-32 LE/BE
-
-2. **Statistical Analysis**
-   - Valid character sequence validation
-   - Character frequency analysis
-   - File name hint processing
-   - Common text pattern detection
-
-3. **Heuristic Analysis**
-   - Byte pattern recognition for Shift-JIS, GB2312, EUC-KR
-
-### Supported Encodings
-
-| Category | Encodings |
-|----------|-----------|
-| Unicode | UTF-8 (with/without BOM), UTF-16 LE/BE, UTF-32 LE/BE |
-| ISO-8859 | Latin-1 through Latin-10, Cyrillic, Arabic, Greek, Hebrew, Turkish, Thai |
-| Windows | Windows-1250 through Windows-1258 |
-| Asian | Shift-JIS, GB2312/GBK, Big5, EUC-KR |
-| Cyrillic | KOI8-R (Russian), KOI8-U (Ukrainian) |
-
-## Result Display Columns
-
-### Content Mode
-
-| Column | Description |
-|--------|-------------|
-| Name | File name |
-| Line | Line number of match |
-| Column | Column position within the line |
-| Text | Matching text snippet (up to 500 characters) |
-| Path | Relative path from search root |
-
-### Files Mode
-
-| Column | Description |
-|--------|-------------|
-| Name | File name |
-| Size | Human-readable file size (B/KB/MB/GB) |
-| Match Count | Number of matches in file |
-| Path | Relative path from search root |
-| Extension | File extension |
-| Encoding | Detected file encoding |
-| Date Modified | Last modification timestamp |
-
-## Search Within Results
-
-After a search completes, Grex can filter the current results list client-side (without re-running the filesystem scan):
-
-- **Content mode**: matches file name, relative path, and line content.
-- **Files mode**: matches file name, relative path, extension, and encoding.
-- **Regex mode**: Click the `.*` toggle button next to the filter box to use regular expressions instead of plain text matching.
-
-## User Data Locations
-
-| Data | Location |
-|------|----------|
-| Settings | `%LocalAppData%\Grex\settings.json` |
-| Recent Paths | `%LocalAppData%\Grex\search_path_history.json` |
-| Search History | `%LocalAppData%\Grex\search_history.json` |
-| Search Profiles | `%LocalAppData%\Grex\search_profiles.json` |
-| Docker Mirrors | `%LocalAppData%\Grex\docker-mirrors\` |
-| Application Logs | `%Temp%\Grex.log` |
-| Notification Diagnostics | `%LocalAppData%\Grex\notification_test.log` |
-
-## Match Files Pattern Syntax
-
-The "Match Files" filter supports glob-style patterns:
-
-| Pattern | Meaning |
-|---------|---------|
-| `*.json` | Match all JSON files |
-| `*.txt` | Match all text files |
-| `*.json\|*.txt` | Match JSON or text files (pipe separator) |
-| `-*.log` | Exclude log files (dash prefix) |
-| `*.json\|-*.bak` | Match JSON files, exclude backup files |
-
-## Exclude Dirs Syntax
-
-The "Exclude Dirs" filter supports two modes:
-
-1. **Comma-separated names**: `node_modules,vendor,.git`
-2. **Regex patterns**: `^(.git|vendor|node_modules)$`
-
-When the value contains `^`, `$`, or `|` but no comma, it's validated as a Regex pattern. Invalid Regex patterns show an error notification and cancel the operation.
-
-## System Paths Auto-Exclusion
-
-When "Include system files" is **unchecked**, Grex automatically excludes these directories:
-
-| Directory | Reason |
-|-----------|--------|
-| `.git` | Git version control |
-| `vendor` | PHP/Composer dependencies |
-| `node_modules` | Node.js dependencies |
-| `storage/framework` | Laravel framework cache |
-| `bin` | Build output (.NET) |
-| `obj` | Build intermediates (.NET) |
-| `sys` | Linux system (Docker/WSL) |
-| `proc` | Linux process info (Docker/WSL) |
-| `dev` | Linux devices (Docker/WSL) |
-
-This exclusion applies to Windows local searches, WSL searches, and Docker container searches.
-
-## Search Timing Display
-
-The status bar formats elapsed time intelligently:
-
-| Duration | Format Example |
-|----------|----------------|
-| < 30 seconds | "12.43 seconds" (with milliseconds) |
-| 30-59 seconds | "45 seconds" (whole seconds) |
-| 1-59 minutes | "2 minutes 15 seconds" |
-| 60+ minutes | "1 hour 9 minutes" |
-
-Singular/plural forms are used correctly ("1 minute" vs "2 minutes").
-
-## WSL Path Formats
-
-Grex supports multiple WSL path formats:
-
-| Format | Example |
-|--------|---------|
-| `\\wsl$\` UNC | `\\wsl$\Ubuntu\home\user` |
-| `\\wsl.localhost\` UNC | `\\wsl.localhost\Ubuntu-24.04\home\user` |
-| Unix-style | `/mnt/c/Users/You` |
-
-All formats are converted appropriately when shelling out to WSL `grep`.
-
-## CLI Reference
-
-The CLI (`grex-cli`) provides headless search for script integration.
-
-### Command Syntax
-
-```
+```text
 grex-cli <path> <term> [options]
 ```
 
-### CLI Options
+The path comes first.
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--regex` | `-E` | Treat search term as regex pattern |
-| `--case-sensitive` | `-i` | Case sensitive search |
-| `--gitignore` | `-g` | Respect .gitignore files |
-| `--include-hidden` | `-H` | Include hidden files |
-| `--include-binary` | `-b` | Include binary files |
-| `--include-system` | `-s` | Include system files |
-| `--no-subfolders` | `-d` | Don't recurse into subdirectories |
-| `--include-symlinks` | `-L` | Follow symbolic links |
-| `--match-files` | `-m` | File name pattern (e.g., `*.cs;*.txt`) |
-| `--exclude-dirs` | `-x` | Directories to exclude (semicolon-separated) |
-| `--size-limit` | | File size limit |
-| `--size-unit` | | Size unit: KB, MB, GB (default: KB) |
-| `--size-type` | | Size comparison: less, equal, greater (default: less) |
-| `--format` | `-f` | Output format: text, json, csv (default: text) |
-| `--count` | `-c` | Only print total match count |
-| `--files-only` | `-l` | Only print file names with matches |
-| `--quiet` | `-q` | Suppress all output, exit code indicates match |
+### Options
 
-### CLI Exit Codes
+| Option | Short | Default | Meaning |
+| --- | --- | --- | --- |
+| `--regex` | `-E` | off | Treat term as Regex |
+| `--case-sensitive` | `-i` | off | Case-sensitive search |
+| `--gitignore` | `-g` | off | Respect `.gitignore` |
+| `--include-hidden` | `-H` | off | Include hidden items |
+| `--include-binary` | `-b` | off | Include searchable binary/document formats |
+| `--include-system` | `-s` | off | Include system files and normally excluded directories |
+| `--no-subfolders` | `-d` | off | Do not recurse |
+| `--include-symlinks` | `-L` | off | Follow symbolic links |
+| `--match-files <pattern>` | `-m` | empty | Filename pattern using `|` alternatives |
+| `--exclude-dirs <value>` | `-x` | empty | Comma names or Regex |
+| `--size-limit <number>` | | none | Size value |
+| `--size-unit <KB\|MB\|GB>` | | `KB` | Size unit |
+| `--size-type <less\|equal\|greater>` | | `less` | Size comparison |
+| `--format <text\|json\|csv>` | `-f` | `text` | Output format |
+| `--count` | `-c` | off | Print total occurrences |
+| `--files-only` | `-l` | off | Print unique full paths |
+| `--quiet` | `-q` | off | Print nothing |
+
+The short `-i` flag is intentionally wired to case-sensitive behavior in the current CLI, unlike GNU grep's conventional meaning.
+
+Invalid size units fall back to KB. Invalid size types become No Limit.
+
+Output-mode priority is Quiet, Count, Files Only, then Format.
+
+### Examples
+
+```powershell
+grex-cli "C:\repo" "TODO"
+grex-cli "C:\repo" "TODO|FIXME" --regex --case-sensitive
+grex-cli "C:\repo" "deprecated" --gitignore --match-files "*.cs|*.xaml"
+grex-cli "C:\repo" "error" --exclude-dirs ".git,node_modules" --format json
+grex-cli "C:\repo" "warning" --count
+grex-cli "C:\repo" "secret" --quiet
+```
+
+PowerShell exit-code use:
+
+```powershell
+grex-cli "C:\repo" "TODO" --quiet
+if ($LASTEXITCODE -eq 0) { "Found" }
+elseif ($LASTEXITCODE -eq 1) { "No match" }
+else { "Search error" }
+```
+
+### Exit codes
 
 | Code | Meaning |
-|------|---------|
-| 0 | Matches found |
-| 1 | No matches found |
-| 2 | Error (invalid path, bad regex, etc.) |
+| --- | --- |
+| `0` | At least one result |
+| `1` | No result |
+| `2` | Invalid path, invalid pattern, cancellation, or another error |
 
-### CLI Output Formats
+### Text output
 
-**Text (default)** - grep-compatible format:
+One line per matching source line, using a relative path:
+
+```text
+path\file.cs:42:10:// TODO: fix this
 ```
-path/to/file.cs:42:10:// TODO: Fix this
-```
 
-**JSON** - Pretty-printed array:
+### JSON output
+
 ```json
 [
   {
-    "file": "path/to/file.cs",
+    "file": "path\\file.cs",
     "line": 42,
     "column": 10,
-    "content": "// TODO: Fix this",
+    "content": "// TODO: fix this",
     "matchCount": 1,
-    "fullPath": "C:\\Projects\\path\\to\\file.cs"
+    "fullPath": "C:\\repo\\path\\file.cs"
   }
 ]
 ```
 
-**CSV** - Header row plus data:
-```
+### CSV output
+
+```csv
 File,Line,Column,Content,FullPath,MatchCount
-path/to/file.cs,42,10,// TODO: Fix this,C:\Projects\path\to\file.cs,1
+path\file.cs,42,10,// TODO: fix this,C:\repo\path\file.cs,1
 ```
 
-## Limitations
+Fields containing commas, quotes, or newlines are CSV-escaped. `--files-only` prints unique full paths rather than formatted records.
 
-- Search results display up to 500 characters per line (full content available in tooltips)
-- Maximum of 20 recent paths stored
-- Maximum of 20 recent searches stored
-- File encoding detection for WSL paths defaults to UTF-8
-- Replace operations modify files directly (no undo functionality)
-- Windows Search integration only works for indexed Windows paths with plain-text searches
-- CLI does not support Docker container searches or replace operations
+### CLI boundaries
 
+The CLI does not expose:
 
+- Docker targets;
+- Replace;
+- Windows Search;
+- culture, normalization, or diacritic flags;
+- GUI history, profiles, preview, or export.
+
+## Operational caps
+
+| Resource | Cap |
+| --- | --- |
+| Local file search/replacement concurrency | 8 files |
+| Direct Docker grep workers | 4 |
+| Match tooltip preview | 400 characters |
+| PDF extraction input | 50 MB |
+| Local replace file size | 100 MB |
+| Encoding-detection read | 64 KB |
+| Context preview seek read | 1 MB |
+| Context lines before/after | 1 to 20 each |
+| Recent paths | 20 |
+| Recent searches | 20 |
+| Search profiles | 50 |
+| AI UI/history messages | 200 |
+| `.gitignore` cache | 100 |
+| Docker grep cache | 50 containers |
+| Localization resource contexts | 20 |
+| Application log | about 1 MB |
+
+## Current limitations
+
+- Windows-only GUI and CLI
+- Published release only for win-x64
+- No replace undo or rollback
+- No empty-string replacement through the GUI
+- No Docker replacement
+- Direct Docker size filtering unavailable
+- Docker direct `.gitignore` support is partial
+- WSL/Docker Regex syntax differs from .NET Regex
+- Best-effort document extraction, no OCR
+- No automatic updater
+- Non-English localization catalogs are incomplete
+- AI keys and settings exports are plain text
+- CLI MB/GB size conversion issue described above
