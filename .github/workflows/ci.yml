@@ -35,5 +35,18 @@ jobs:
       - name: Build solution
         run: dotnet build grex.sln -p:Platform=x64 --configuration Release --no-restore
 
-      - name: Test solution
-        run: dotnet test grex.sln -p:Platform=x64 --configuration Release --no-build --blame-hang --blame-hang-timeout 3m -m:1
+      - name: Test unit suite
+        timeout-minutes: 10
+        run: dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 --configuration Release --no-restore --blame-hang --blame-hang-timeout 3m
+
+      - name: Test CLI suite
+        timeout-minutes: 10
+        run: dotnet test Tests/Grex.Cli.Tests/Grex.Cli.Tests.csproj -p:Platform=x64 --configuration Release --no-restore --blame-hang --blame-hang-timeout 3m
+
+      - name: Test integration suite
+        timeout-minutes: 10
+        run: dotnet test IntegrationTests/Grex.IntegrationTests.csproj -p:Platform=x64 --configuration Release --no-restore --blame-hang --blame-hang-timeout 3m
+
+      - name: Test UI suite
+        timeout-minutes: 10
+        run: dotnet test UITests/Grex.UITests.csproj -p:Platform=x64 --configuration Release --no-restore --blame-hang --blame-hang-timeout 3m
