@@ -1,25 +1,11 @@
-using System;
 using FluentAssertions;
-using Grex.Controls;
+using Grex.Services;
 using Xunit;
 
 namespace Grex.Tests.Controls
 {
     public class ExcludeDirsValidationTests
     {
-        // Use reflection to access the private static method
-        private static bool IsValidRegexPattern(string pattern)
-        {
-            var method = typeof(SearchTabContent).GetMethod(
-                "IsValidRegexPattern",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-            
-            if (method == null)
-                throw new InvalidOperationException("IsValidRegexPattern method not found");
-            
-            return (bool)method.Invoke(null, new object[] { pattern })!;
-        }
-
         [Theory]
         [InlineData("^(**|resources)$", false)] // Nested quantifiers
         [InlineData("**", false)] // Nested quantifiers
@@ -34,7 +20,7 @@ namespace Grex.Tests.Controls
         public void IsValidRegexPattern_ShouldValidateCorrectly(string pattern, bool expected)
         {
             // Act
-            var result = IsValidRegexPattern(pattern);
+            var result = SearchService.IsValidRegexPattern(pattern);
 
             // Assert
             result.Should().Be(expected, $"Pattern '{pattern}' should be {(expected ? "valid" : "invalid")}");

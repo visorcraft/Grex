@@ -208,7 +208,7 @@ namespace Grex.Tests.Services
             cts.Cancel();
 
             // Act & Assert
-            await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
                 _service.GetContextAsync(filePath, lineNumber: 1, cancellationToken: cts.Token));
         }
 

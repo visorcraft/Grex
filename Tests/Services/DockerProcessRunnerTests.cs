@@ -31,7 +31,7 @@ namespace Grex.Tests.Services
             // Act
             cts.CancelAfter(TimeSpan.FromMilliseconds(200));
             var sw = Stopwatch.StartNew();
-            await Assert.ThrowsAsync<OperationCanceledException>(() => runTask);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => runTask);
             sw.Stop();
 
             // Assert

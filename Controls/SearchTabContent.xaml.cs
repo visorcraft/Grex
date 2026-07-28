@@ -35,8 +35,6 @@ namespace Grex.Controls
         private readonly ObservableCollection<AiChatMessage> _aiChatMessages = new ObservableCollection<AiChatMessage>();
         private readonly List<AiConversationTurn> _aiConversationHistory = new List<AiConversationTurn>();
         private const int MaxAiChatMessages = 200; // cap both UI list and conversation payload
-        private static readonly TimeSpan RegexValidationTimeout = TimeSpan.FromSeconds(2);
-
         private CancellationTokenSource? _aiRequestCancellationTokenSource;
         private bool _isCurrentOperationReplace = false; // Tracks whether the current operation is a Replace
         private bool _isAiModeActive = false;
@@ -1898,96 +1896,7 @@ namespace Grex.Controls
         }
 
         private static bool IsValidRegexPattern(string pattern)
-        {
-            if (string.IsNullOrEmpty(pattern))
-                return true;
-
-            // Check for specific invalid patterns first (before trying to construct regex)
-            
-            // Check for nested quantifiers: *, **, ???, +++, {{
-            // These are always invalid regardless of context
-            if (pattern.Contains("???") || pattern.Contains("++") || pattern.Contains("**") || pattern.Contains("{{"))
-            {
-                return false;
-            }
-            // Also check for ?? (two question marks - invalid nested quantifier)
-            // But *? is valid (non-greedy), so we need to check context
-            // Simple approach: check for ?? that's not preceded by *
-            for (int i = 1; i < pattern.Length; i++)
-            {
-                if (pattern[i] == '?' && pattern[i - 1] == '?' && (i < 2 || pattern[i - 2] != '*'))
-                {
-                    return false;
-                }
-            }
-
-            // Check for trailing unescaped backslash (odd number of backslashes at the end)
-            int trailingBackslashes = 0;
-            for (int i = pattern.Length - 1; i >= 0 && pattern[i] == '\\'; i--)
-            {
-                trailingBackslashes++;
-            }
-            if (trailingBackslashes % 2 == 1) // Odd number means unescaped trailing backslash
-            {
-                return false;
-            }
-
-            // Check for unclosed groups (count opening and closing parentheses and brackets)
-            // Need to account for escaped characters
-            int openParens = 0;
-            int openBrackets = 0;
-            bool inEscape = false;
-            for (int i = 0; i < pattern.Length; i++)
-            {
-                char c = pattern[i];
-                if (inEscape)
-                {
-                    inEscape = false;
-                    continue;
-                }
-                if (c == '\\')
-                {
-                    inEscape = true;
-                    continue;
-                }
-                if (c == '(')
-                    openParens++;
-                else if (c == ')')
-                    openParens--;
-                else if (c == '[')
-                    openBrackets++;
-                else if (c == ']')
-                    openBrackets--;
-            }
-            if (openParens != 0 || openBrackets != 0)
-            {
-                return false;
-            }
-
-            // Try to create and use the regex to catch runtime errors
-            // This will catch patterns like ^(**|resources)$ which have invalid quantifiers
-            // The Regex constructor should throw ArgumentException for invalid patterns
-            try
-            {
-                var regex = new System.Text.RegularExpressions.Regex(
-                    pattern,
-                    System.Text.RegularExpressions.RegexOptions.None,
-                    RegexValidationTimeout);
-                // Also try to match an empty string to catch any runtime issues
-                regex.IsMatch("");
-                return true;
-            }
-            catch (ArgumentException)
-            {
-                // ArgumentException is thrown for invalid regex patterns
-                return false;
-            }
-            catch (Exception)
-            {
-                // Catch any other exceptions (shouldn't happen, but be safe)
-                return false;
-            }
-        }
+            => SearchService.IsValidRegexPattern(pattern);
 
         /// <summary>
         /// Checks if the path looks like a WSL home directory accessed through Windows

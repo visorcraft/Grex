@@ -124,6 +124,22 @@ namespace Grex.Services
             return false;
         }
 
+        internal static bool IsValidRegexPattern(string pattern)
+        {
+            if (string.IsNullOrEmpty(pattern))
+                return true;
+
+            try
+            {
+                _ = new Regex(pattern, RegexOptions.None, RegexMatchTimeout);
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+
         private async Task<List<SearchResult>> SearchWindowsPathAsync(
             string path,
             string searchTerm,
