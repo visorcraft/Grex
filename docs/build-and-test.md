@@ -131,32 +131,34 @@ dotnet run --project Grex.Cli/Grex.Cli.csproj -p:Platform=x64 -- "C:\repo" "TODO
 
 ## Test
 
+Keep `WindowsAppSdkBootstrapInitialize=false` on test commands. The application project is an unpackaged WinUI executable, so its normal build injects the Windows App SDK bootstrap module initializer. Loading that initializer inside `testhost` keeps the Dynamic Dependency Lifetime Manager active after the tests finish. Test builds disable only that initializer; normal app builds and publishes keep it enabled.
+
 ### Entire solution
 
 ```powershell
-dotnet test grex.sln -p:Platform=x64
+dotnet test grex.sln -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false
 ```
 
 ### Release configuration
 
 ```powershell
-dotnet test grex.sln -c Release -p:Platform=x64
+dotnet test grex.sln -c Release -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false
 ```
 
 ### Individual projects
 
 ```powershell
-dotnet test Tests/Grex.Tests.csproj -p:Platform=x64
-dotnet test Tests/Grex.Cli.Tests/Grex.Cli.Tests.csproj -p:Platform=x64
-dotnet test IntegrationTests/Grex.IntegrationTests.csproj -p:Platform=x64
-dotnet test UITests/Grex.UITests.csproj -p:Platform=x64
+dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false
+dotnet test Tests/Grex.Cli.Tests/Grex.Cli.Tests.csproj -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false
+dotnet test IntegrationTests/Grex.IntegrationTests.csproj -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false
+dotnet test UITests/Grex.UITests.csproj -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false
 ```
 
 ### One class or method
 
 ```powershell
-dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~SearchServiceTests"
-dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~TestMethodName"
+dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false --filter "FullyQualifiedName~SearchServiceTests"
+dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false --filter "FullyQualifiedName~TestMethodName"
 ```
 
 xUnit 2.9.3 does not provide `Assert.Skip` or `Assert.SkipUnless`. For a runtime condition, return early or use `Xunit.SkippableFact`. Static `[Fact(Skip = "...")]` is used for tests that require unavailable WinUI initialization.
@@ -293,7 +295,7 @@ When adding, removing, or updating a GUI NuGet dependency:
 
    ```powershell
    python Scripts/test_generate_third_party_notices.py
-   dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~CreditsLicenseCoverageTests"
+   dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false --filter "FullyQualifiedName~CreditsLicenseCoverageTests"
    ```
 
 Never hand-edit `THIRD-PARTY-NOTICES.txt`.

@@ -137,7 +137,7 @@ git clone https://github.com/visorcraft/Grex.git
 cd Grex
 dotnet restore grex.sln
 dotnet build grex.sln -p:Platform=x64
-dotnet test grex.sln -p:Platform=x64
+dotnet test grex.sln -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false
 dotnet run --project Grex.csproj -p:Platform=x64
 ```
 

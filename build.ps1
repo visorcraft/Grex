@@ -43,7 +43,7 @@ dotnet build grex.sln -p:Platform=$Platform -c $Config --no-restore
 Confirm-Exit 'Build'
 
 Step 'Test'
-dotnet test grex.sln -p:Platform=$Platform -c $Config --no-restore
+dotnet test grex.sln -p:Platform=$Platform -p:WindowsAppSdkBootstrapInitialize=false -c $Config --no-restore
 $testsPassed = ($LASTEXITCODE -eq 0)
 if (-not $testsPassed) {
     Write-Warning "Tests failed (exit $LASTEXITCODE) - continuing so artifacts are still produced."

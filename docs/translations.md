@@ -224,9 +224,9 @@ python -m pytest Scripts/test_add_localization_entry.py Scripts/test_remove_loca
 On Windows, run localization-focused .NET tests:
 
 ```powershell
-dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~Localization"
-dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~RegexBuilderLanguage"
-dotnet test IntegrationTests/Grex.IntegrationTests.csproj -p:Platform=x64 --filter "FullyQualifiedName~AiSearchLocalization"
+dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false --filter "FullyQualifiedName~Localization"
+dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false --filter "FullyQualifiedName~RegexBuilderLanguage"
+dotnet test IntegrationTests/Grex.IntegrationTests.csproj -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false --filter "FullyQualifiedName~AiSearchLocalization"
 ```
 
 Then manually verify:

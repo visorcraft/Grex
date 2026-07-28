@@ -79,7 +79,7 @@ Read [Architecture](docs/architecture.md) before changing component boundaries.
 ```powershell
 dotnet build grex.sln -c Debug -p:Platform=x64
 dotnet build grex.sln -c Release -p:Platform=x64
-dotnet test grex.sln -c Release -p:Platform=x64
+dotnet test grex.sln -c Release -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false
 dotnet run --project Grex.csproj -p:Platform=x64
 dotnet run --project Grex.Cli/Grex.Cli.csproj -p:Platform=x64 -- "C:\repo" "TODO"
 ```
@@ -130,7 +130,7 @@ Match tests to the changed boundary:
 Full gate:
 
 ```powershell
-dotnet test grex.sln -c Release -p:Platform=x64
+dotnet test grex.sln -c Release -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false
 ```
 
 `.github/workflows/ci.yml` runs the Release x64 build and full solution test gate on pull requests, pushes to `master`, and manual dispatches.
@@ -138,7 +138,7 @@ dotnet test grex.sln -c Release -p:Platform=x64
 Focused test:
 
 ```powershell
-dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~SearchServiceTests"
+dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false --filter "FullyQualifiedName~SearchServiceTests"
 ```
 
 xUnit 2.9.3 has no `Assert.Skip` or `Assert.SkipUnless`. Return early for a runtime condition or use `Xunit.SkippableFact`. Use static `[Fact(Skip = "...")]` only when the reason is fixed and explicit.
@@ -254,7 +254,7 @@ For any GUI NuGet change:
 
    ```powershell
    python Scripts/test_generate_third_party_notices.py
-   dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 --filter "FullyQualifiedName~CreditsLicenseCoverageTests"
+   dotnet test Tests/Grex.Tests.csproj -p:Platform=x64 -p:WindowsAppSdkBootstrapInitialize=false --filter "FullyQualifiedName~CreditsLicenseCoverageTests"
    ```
 
 Never hand-edit `THIRD-PARTY-NOTICES.txt`.
