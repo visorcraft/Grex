@@ -336,7 +336,7 @@ There is no maintained icon-generation project in this repository. When replacin
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on pull requests, pushes to `master`, and manual dispatches. Its Windows x64 job restores the solution, builds Release without a second restore, and tests every solution project without rebuilding.
+`.github/workflows/ci.yml` runs on pull requests, pushes to `master`, and manual dispatches. Its Windows x64 job restores the solution, builds Release without a second restore, and tests every solution project without rebuilding. Test projects run serially to avoid shared-machine state collisions. A three-minute per-test hang detector stops deadlocked test hosts, and the job has a 30-minute ceiling.
 
 ## Release workflow
 

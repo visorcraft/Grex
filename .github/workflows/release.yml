@@ -29,7 +29,7 @@ jobs:
         run: dotnet build grex.sln -p:Platform=x64 --configuration Release --no-restore
 
       - name: Test solution
-        run: dotnet test grex.sln -p:Platform=x64 --configuration Release --no-build
+        run: dotnet test grex.sln -p:Platform=x64 --configuration Release --no-build --blame-hang --blame-hang-timeout 3m -m:1
 
       - name: Publish, package, and build installer
         shell: pwsh
